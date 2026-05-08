@@ -79,5 +79,6 @@
         "laravel-boost*": "allow",
         "context7": "allow",
         "skill": "allow"
-    }
+    },
+    "plugin": ["opencode-supermemory", "oh-my-opencode-slim"]
 }

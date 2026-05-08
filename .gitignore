@@ -11,6 +11,8 @@
 /resources/js/routes
 /resources/js/wayfinder
 /vendor
+opencode.json
+.serena
 .DS_Store
 .env
 .env.backup
