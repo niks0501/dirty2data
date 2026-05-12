@@ -13,6 +13,15 @@ export interface DatasetSummary {
     rowCount: number;
     columnCount: number;
     createdAt: string;
+    status: string;
+}
+
+export interface DatasetProcessingStatus {
+    progress: number;
+    rowsProcessed: number;
+    startedAt: string | null;
+    finishedAt: string | null;
+    error: string | null;
 }
 
 export interface DatasetColumnProfile {
@@ -121,6 +130,7 @@ export interface DatasetPageProps {
     columnCount: number;
     headers: string[];
     previewRows: Array<Record<string, DatasetValue>>;
+    previewNote: string | null;
     profile: DatasetProfile | null;
     selectedColumn: string | null;
     selectedColumnProfile: DatasetColumnProfile | null;
@@ -129,4 +139,6 @@ export interface DatasetPageProps {
     chartRecommendations: DatasetChartRecommendation[];
     chart: DatasetChartPayload;
     createdAt: string;
+    status: string;
+    processing: DatasetProcessingStatus;
 }

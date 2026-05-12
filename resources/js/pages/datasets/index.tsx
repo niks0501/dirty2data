@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FileSpreadsheet, Upload } from 'lucide-react';
+import { FileSpreadsheet, Loader2, Upload } from 'lucide-react';
 import AlertError from '@/components/alert-error';
 import WorkflowSteps from '@/components/datasets/workflow-steps';
 import Heading from '@/components/heading';
@@ -74,9 +74,9 @@ export default function Index({ datasets }: Props) {
                             <CardTitle>Upload your dataset</CardTitle>
                             <CardDescription>
                                 Accepted formats: CSV, XLSX, XLS. Maximum size:
-                                10MB. After upload, you will enter the dataset
-                                workspace to profile columns, clean issues, and
-                                visualize results.
+                                50MB. Files over 200,000 rows are processed in
+                                the background and will show progress on the
+                                dataset page.
                             </CardDescription>
                         </CardHeader>
 
@@ -167,9 +167,22 @@ export default function Index({ datasets }: Props) {
                                         href={`/datasets/${dataset.id}`}
                                         className="block rounded-lg border p-3 transition-colors hover:bg-[#F7F9FA]"
                                     >
-                                        <p className="font-medium text-[#353535]">
-                                            {dataset.originalName}
-                                        </p>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className="font-medium text-[#353535]">
+                                                {dataset.originalName}
+                                            </p>
+                                            {dataset.status === 'processing' && (
+                                                <span className="flex items-center gap-1 rounded-full bg-[#E7F0F5] px-2 py-0.5 text-xs font-medium text-[#284B63]">
+                                                    <Loader2 className="size-3 animate-spin" />
+                                                    Processing
+                                                </span>
+                                            )}
+                                            {dataset.status === 'failed' && (
+                                                <span className="rounded-full bg-[#FDECEC] px-2 py-0.5 text-xs font-medium text-[#C62828]">
+                                                    Failed
+                                                </span>
+                                            )}
+                                        </div>
                                         <p className="text-sm text-muted-foreground">
                                             {dataset.rowCount.toLocaleString()}{' '}
                                             rows · {dataset.columnCount} columns

@@ -143,15 +143,14 @@ test('invalid file type returns validation error', function () {
     $this->assertDatabaseCount('datasets', 0);
 });
 
-// ─── Negative: File Exceeding 10MB ──────────────────────────────────────────
+// ─── Negative: File Exceeding 50MB ──────────────────────────────────────────
 
-test('file exceeding 10mb returns validation error', function () {
+test('file exceeding 50mb returns validation error', function () {
     Storage::fake('local');
 
     $user = User::factory()->create();
 
-    // 10241 KB > 10240 KB (10 MB)
-    $file = UploadedFile::fake()->create('large.csv', 10241);
+    $file = UploadedFile::fake()->create('large.csv', 51201);
 
     $response = $this
         ->actingAs($user)

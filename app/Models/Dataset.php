@@ -31,6 +31,12 @@ class Dataset extends Model
         'preview',
         'profile',
         'cleaning_log',
+        'status',
+        'processing_started_at',
+        'processing_finished_at',
+        'processing_error',
+        'processing_progress',
+        'processing_rows_processed',
     ];
 
     /**
@@ -60,6 +66,10 @@ class Dataset extends Model
             'preview' => 'array',
             'profile' => 'array',
             'cleaning_log' => 'array',
+            'processing_started_at' => 'datetime',
+            'processing_finished_at' => 'datetime',
+            'processing_progress' => 'integer',
+            'processing_rows_processed' => 'integer',
         ];
     }
 }

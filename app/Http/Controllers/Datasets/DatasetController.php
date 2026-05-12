@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Datasets\ChartDatasetRequest;
 use App\Http\Requests\Datasets\CleanDatasetRequest;
 use App\Http\Requests\Datasets\StoreDatasetRequest;
+use App\Jobs\ProcessDatasetUpload;
 use App\Models\Dataset;
 use App\Services\Datasets\DatasetChartBuilder;
 use App\Services\Datasets\DatasetChartRecommender;
@@ -24,9 +25,10 @@ use Inertia\Response;
 
 class DatasetController extends Controller
 {
-    /**
-     * Display the dataset upload page.
-     */
+    private const int SYNC_ROW_LIMIT = 200_000;
+
+    private const int MAX_STORED_ROWS = 5_000;
+
     public function index(Request $request): Response
     {
         $datasets = Dataset::query()
@@ -39,6 +41,7 @@ class DatasetController extends Controller
                 'rowCount' => $dataset->row_count,
                 'columnCount' => $dataset->column_count,
                 'createdAt' => $dataset->created_at->toISOString(),
+                'status' => $dataset->status,
             ]);
 
         return Inertia::render('datasets/index', [
@@ -46,9 +49,6 @@ class DatasetController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly uploaded dataset file.
-     */
     public function store(
         StoreDatasetRequest $request,
         DatasetPreviewParser $parser,
@@ -65,8 +65,49 @@ class DatasetController extends Controller
             $uuidFilename,
         );
 
-        $parsed = $parser->parse($file->getRealPath(), $extension);
+        $filePath = $file->getRealPath();
+        $rowCount = $parser->countRows($filePath, $extension);
+
+        if ($rowCount > self::SYNC_ROW_LIMIT) {
+            $dataset = Dataset::create([
+                'uploaded_by_id' => $user->id,
+                'original_name' => $file->getClientOriginalName(),
+                'disk_path' => $storedPath,
+                'mime_type' => $file->getMimeType(),
+                'extension' => strtolower($extension),
+                'size_bytes' => $file->getSize(),
+                'row_count' => $rowCount,
+                'column_count' => 0,
+                'headers' => [],
+                'original_records' => [],
+                'cleaned_records' => [],
+                'preview' => null,
+                'profile' => null,
+                'cleaning_log' => [],
+                'status' => 'processing',
+            ]);
+
+            ProcessDatasetUpload::dispatch($dataset);
+
+            return to_route('datasets.show', [
+                'dataset' => $dataset->id,
+            ])->with('toast', [
+                'type' => 'info',
+                'message' => __('Large dataset detected. Processing in the background — you will see results shortly.'),
+            ]);
+        }
+
+        try {
+            $parsed = $parser->parse($filePath, $extension);
+        } catch (\InvalidArgumentException|\RuntimeException $e) {
+            throw ValidationException::withMessages([
+                'dataset_file' => $e->getMessage(),
+            ]);
+        }
         $profile = $profiler->profile($parsed['records'], $parsed['headers']);
+
+        $previewLimit = min($parsed['row_count'], self::MAX_STORED_ROWS);
+        $previewRecords = array_slice($parsed['records'], 0, $previewLimit);
 
         $dataset = Dataset::create([
             'uploaded_by_id' => $user->id,
@@ -78,16 +119,20 @@ class DatasetController extends Controller
             'row_count' => $parsed['row_count'],
             'column_count' => $parsed['column_count'],
             'headers' => $parsed['headers'],
-            'original_records' => $parsed['records'],
-            'cleaned_records' => $parsed['records'],
+            'original_records' => $previewRecords,
+            'cleaned_records' => $previewRecords,
             'preview' => [
                 'headers' => $parsed['headers'],
-                'sample_rows' => $parsed['sample_rows'],
+                'sample_rows' => array_slice($previewRecords, 0, 15),
                 'row_count' => $parsed['row_count'],
                 'column_count' => $parsed['column_count'],
+                'preview_note' => $parsed['row_count'] > self::MAX_STORED_ROWS
+                    ? 'Showing first '.number_format(self::MAX_STORED_ROWS).' rows of '.number_format($parsed['row_count']).'.'
+                    : null,
             ],
             'profile' => $profile,
             'cleaning_log' => [],
+            'status' => 'ready',
         ]);
 
         return to_route('datasets.show', [
@@ -98,9 +143,6 @@ class DatasetController extends Controller
         ]);
     }
 
-    /**
-     * Display the dataset workflow page.
-     */
     public function show(
         Request $request,
         Dataset $dataset,
@@ -109,14 +151,18 @@ class DatasetController extends Controller
     ): Response {
         $this->authorizeDataset($request, $dataset);
 
+        $isProcessing = $dataset->status === 'processing';
+
         $records = $dataset->cleaned_records ?? [];
         $headers = $dataset->headers ?? [];
         $profile = $dataset->profile;
-        $chartRecommendations = $chartRecommender->recommend($dataset);
+
+        $chartRecommendations = $isProcessing ? [] : $chartRecommender->recommend($dataset);
         $defaultRecommendation = $chartRecommendations[0] ?? null;
+
         $page = max((int) $request->integer('page', 1), 1);
         $perPage = 15;
-        $previewRows = array_slice($records, ($page - 1) * $perPage, $perPage);
+        $previewRows = $isProcessing ? [] : array_slice($records, ($page - 1) * $perPage, $perPage);
 
         $chartType = $request->string('chart_type')->toString() ?: ($defaultRecommendation['type'] ?? 'bar');
         $xColumn = $request->string('x_column')->toString() ?: ($defaultRecommendation['x_column'] ?? ($headers[0] ?? null));
@@ -129,6 +175,12 @@ class DatasetController extends Controller
             'date_group' => $request->string('date_group')->toString() ?: 'day',
         ];
 
+        $chart = $isProcessing
+            ? ['type' => 'bar', 'title' => 'Processing…', 'data' => [], 'message' => 'Dataset is still being processed.', 'x_column' => null, 'y_column' => null, 'reason' => null, 'metadata' => null]
+            : $chartBuilder->build($dataset, $chartType, $xColumn, $yColumn !== '' ? $yColumn : null, $chartOptions);
+
+        $previewNote = $dataset->preview['preview_note'] ?? null;
+
         return Inertia::render('datasets/show', [
             'dataset' => [
                 'id' => $dataset->id,
@@ -136,31 +188,37 @@ class DatasetController extends Controller
                 'mimeType' => $dataset->mime_type,
                 'extension' => $dataset->extension,
                 'sizeBytes' => $dataset->size_bytes,
-                'rowCount' => count($records),
-                'originalRowCount' => count($dataset->original_records ?? []),
+                'rowCount' => $dataset->row_count,
+                'originalRowCount' => $dataset->row_count,
                 'columnCount' => $dataset->column_count,
                 'headers' => $headers,
                 'previewRows' => $previewRows,
+                'previewNote' => $previewNote,
                 'profile' => $profile,
-                'selectedColumn' => $selectedColumn,
-                'selectedColumnProfile' => $selectedColumnProfile,
+                'selectedColumn' => $isProcessing ? null : $selectedColumn,
+                'selectedColumnProfile' => $isProcessing ? null : $selectedColumnProfile,
                 'cleaningLog' => $dataset->cleaning_log ?? [],
                 'pagination' => [
                     'page' => $page,
                     'perPage' => $perPage,
-                    'total' => count($records),
-                    'lastPage' => max((int) ceil(count($records) / $perPage), 1),
+                    'total' => $isProcessing ? 0 : count($records),
+                    'lastPage' => $isProcessing ? 1 : max((int) ceil(count($records) / $perPage), 1),
                 ],
                 'chartRecommendations' => $chartRecommendations,
-                'chart' => $chartBuilder->build($dataset, $chartType, $xColumn, $yColumn !== '' ? $yColumn : null, $chartOptions),
+                'chart' => $chart,
                 'createdAt' => $dataset->created_at->toISOString(),
+                'status' => $dataset->status,
+                'processing' => [
+                    'progress' => $dataset->processing_progress,
+                    'rowsProcessed' => $dataset->processing_rows_processed,
+                    'startedAt' => $dataset->processing_started_at?->toISOString(),
+                    'finishedAt' => $dataset->processing_finished_at?->toISOString(),
+                    'error' => $dataset->processing_error,
+                ],
             ],
         ]);
     }
 
-    /**
-     * Apply a manual cleaning action to the working cleaned dataset.
-     */
     public function clean(
         CleanDatasetRequest $request,
         Dataset $dataset,
@@ -194,9 +252,6 @@ class DatasetController extends Controller
         ]);
     }
 
-    /**
-     * Preview a manual cleaning action without mutating the working dataset.
-     */
     public function previewClean(
         CleanDatasetRequest $request,
         Dataset $dataset,
@@ -217,9 +272,6 @@ class DatasetController extends Controller
         ]);
     }
 
-    /**
-     * Return a compact chart payload for async consumers.
-     */
     public function chart(ChartDatasetRequest $request, Dataset $dataset, DatasetChartBuilder $chartBuilder): JsonResponse
     {
         $this->authorizeDataset($request, $dataset);

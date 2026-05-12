@@ -21,16 +21,16 @@ export default function AttributePanel({
     onSelectColumn,
 }: Props) {
     return (
-        <Card className="h-full">
-            <CardHeader>
+        <Card className="h-full max-h-[calc(100vh-16rem)]">
+            <CardHeader className="shrink-0">
                 <CardTitle>Columns</CardTitle>
                 <CardDescription>
-                    WEKA-style attribute list. Select a column to inspect its
+                    Select a column to inspect its
                     quality and chart recommendation.
                 </CardDescription>
             </CardHeader>
 
-            <CardContent className="space-y-2">
+            <CardContent className="flex-1 space-y-2 overflow-y-auto min-h-0">
                 {columns.length > 0 ? (
                     columns.map((column) => {
                         const hasIssue = column.missing_count > 0;

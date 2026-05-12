@@ -47,8 +47,8 @@ export default function SelectedColumnProfile({ column }: Props) {
     ];
 
     return (
-        <Card>
-            <CardHeader>
+        <Card className="max-h-[calc(100vh-16rem)]">
+            <CardHeader className="shrink-0">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <CardTitle>{column.name}</CardTitle>
@@ -61,10 +61,10 @@ export default function SelectedColumnProfile({ column }: Props) {
                 </div>
             </CardHeader>
 
-            <CardContent className="space-y-5">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <CardContent className="flex-1 space-y-4 overflow-y-auto min-h-0">
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     {stats.map(([label, value]) => (
-                        <div key={label} className="rounded-xl border p-3">
+                        <div key={label} className="rounded-xl border p-2.5">
                             <p className="text-xs text-muted-foreground">
                                 {label}
                             </p>
@@ -76,12 +76,12 @@ export default function SelectedColumnProfile({ column }: Props) {
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-2">
-                    <div className="rounded-xl border p-4">
+                    <div className="rounded-xl border p-3">
                         <div className="mb-3 flex items-center gap-2">
                             <BarChart3 className="size-4 text-[#284B63]" />
                             <h3 className="font-semibold">Distinct values</h3>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex max-h-[160px] flex-wrap gap-2 overflow-y-auto">
                             {column.distinct_values.length > 0 ? (
                                 column.distinct_values.map((value) => (
                                     <Badge key={value.value} variant="outline">
@@ -96,9 +96,9 @@ export default function SelectedColumnProfile({ column }: Props) {
                         </div>
                     </div>
 
-                    <div className="rounded-xl border p-4">
+                    <div className="rounded-xl border p-3">
                         <h3 className="mb-3 font-semibold">Sample values</h3>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex max-h-[160px] flex-wrap gap-2 overflow-y-auto">
                             {column.sample_values.length > 0 ? (
                                 column.sample_values.map((value) => (
                                     <Badge key={value} variant="secondary">

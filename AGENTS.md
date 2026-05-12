@@ -10,6 +10,7 @@ Pest for PHP testing, Pint (Laravel preset) for PHP linting, ESLint + Prettier f
 
 Always refer to [design-system.md](./design-system.md) for UI/UX standards.
 Context files in `.opencode/context/` provide additional workflow and code-quality guidance.
+Always run a laravel artisan command when generating migrations, controllers, etc. (e.g. `php artisan make:model MyModel -mcr`). This ensures proper file placement and naming conventions. Use laravel-boost mcp for their documentation and best practices.
 
 ## Commands
 
