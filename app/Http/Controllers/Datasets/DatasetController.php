@@ -120,9 +120,14 @@ class DatasetController extends Controller
 
         $chartType = $request->string('chart_type')->toString() ?: ($defaultRecommendation['type'] ?? 'bar');
         $xColumn = $request->string('x_column')->toString() ?: ($defaultRecommendation['x_column'] ?? ($headers[0] ?? null));
-        $yColumn = $request->string('y_column')->toString() ?: ($defaultRecommendation['y_column'] ?? null);
+        $yColumn = $request->string('y_column')->toString() ?: ($defaultRecommendation['y_column'] ?? '');
         $selectedColumn = $request->string('column')->toString() ?: ($headers[0] ?? null);
         $selectedColumnProfile = $this->selectedColumnProfile($profile, $selectedColumn);
+        $chartOptions = [
+            'aggregation' => $request->string('aggregation')->toString() ?: 'sum',
+            'bin_count' => $request->integer('bin_count', 8),
+            'date_group' => $request->string('date_group')->toString() ?: 'day',
+        ];
 
         return Inertia::render('datasets/show', [
             'dataset' => [
@@ -147,7 +152,7 @@ class DatasetController extends Controller
                     'lastPage' => max((int) ceil(count($records) / $perPage), 1),
                 ],
                 'chartRecommendations' => $chartRecommendations,
-                'chart' => $chartBuilder->build($dataset, $chartType, $xColumn, $yColumn),
+                'chart' => $chartBuilder->build($dataset, $chartType, $xColumn, $yColumn !== '' ? $yColumn : null, $chartOptions),
                 'createdAt' => $dataset->created_at->toISOString(),
             ],
         ]);
@@ -227,8 +232,21 @@ class DatasetController extends Controller
                 $validated['chart_type'],
                 $validated['x_column'],
                 $validated['y_column'] ?? null,
+                $this->chartOptions($request),
             ),
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function chartOptions(Request $request): array
+    {
+        return [
+            'aggregation' => $request->string('aggregation')->toString() ?: 'sum',
+            'bin_count' => $request->integer('bin_count', 8),
+            'date_group' => $request->string('date_group')->toString() ?: 'day',
+        ];
     }
 
     private function authorizeDataset(Request $request, Dataset $dataset): void

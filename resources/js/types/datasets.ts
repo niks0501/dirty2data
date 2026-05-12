@@ -73,6 +73,17 @@ export interface DatasetPagination {
     lastPage: number;
 }
 
+export interface DatasetChartMetadata {
+    total_rows_used: number;
+    missing_rows_skipped: number;
+    aggregation: string;
+    truncated: boolean;
+    total_categories?: number;
+    bin_count?: number;
+    date_group?: string;
+    correlation?: number | null;
+}
+
 export interface DatasetChartPayload {
     type: 'bar' | 'line' | 'pie' | 'histogram' | 'scatter' | string;
     title: string;
@@ -88,6 +99,7 @@ export interface DatasetChartPayload {
     x_column: string | null;
     y_column: string | null;
     reason?: string | null;
+    metadata: DatasetChartMetadata | null;
 }
 
 export interface DatasetChartRecommendation {

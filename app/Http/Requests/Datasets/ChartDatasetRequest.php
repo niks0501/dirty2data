@@ -21,6 +21,9 @@ class ChartDatasetRequest extends FormRequest
             'chart_type' => ['required', Rule::in(['bar', 'line', 'pie', 'histogram', 'scatter'])],
             'x_column' => ['required', 'string'],
             'y_column' => ['nullable', 'string'],
+            'aggregation' => ['nullable', Rule::in(['sum', 'average', 'count', 'min', 'max'])],
+            'bin_count' => ['nullable', 'integer', 'min:2', 'max:20'],
+            'date_group' => ['nullable', Rule::in(['day', 'month', 'year'])],
         ];
     }
 }
