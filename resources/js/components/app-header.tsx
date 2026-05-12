@@ -3,7 +3,7 @@ import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { Breadcrumbs } from '@/components/breadcrumbs';
-import { TeamSwitcher } from '@/components/team-switcher';
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -59,15 +59,14 @@ const activeItemStyles =
 
 export function AppHeader({ breadcrumbs = [] }: Props) {
     const page = usePage();
-    const { auth, currentTeam } = page.props;
+    const { auth } = page.props;
     const getInitials = useInitials();
     const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
-    const dashboardUrl = currentTeam ? dashboard(currentTeam.slug) : '/';
 
     const mainNavItems: NavItem[] = [
         {
             title: 'Dashboard',
-            href: dashboardUrl,
+            href: dashboard(),
             icon: LayoutGrid,
         },
     ];
@@ -138,7 +137,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                     </div>
 
                     <Link
-                        href={dashboardUrl}
+                        href={dashboard()}
                         prefetch
                         className="flex items-center space-x-2"
                     >
@@ -240,7 +239,6 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                             </DropdownMenuContent>
                         </DropdownMenu>
 
-                        <TeamSwitcher inHeader />
                     </div>
                 </div>
             </div>

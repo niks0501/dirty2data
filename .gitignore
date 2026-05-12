@@ -12,6 +12,8 @@
 /resources/js/wayfinder
 /vendor
 /opencode.json
+.tmp
+.opencode
 .serena
 .DS_Store
 .env
