@@ -5,8 +5,9 @@ use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Excel as ExcelReader;
+use Maatwebsite\Excel\Facades\Excel;
 
 /*
 |--------------------------------------------------------------------------
@@ -21,6 +22,8 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 // ─── Positive: Upload Page Access ───────────────────────────────────────────
 
 test('datasets upload page renders for authenticated user', function () {
+    $this->withoutVite();
+
     $user = User::factory()->create();
 
     $response = $this
@@ -67,6 +70,9 @@ test('valid csv upload creates dataset record', function () {
     expect($dataset->preview['row_count'])->toBe(2);
     expect($dataset->preview['column_count'])->toBe(3);
     expect($dataset->preview['sample_rows'])->toHaveCount(2);
+    expect($dataset->original_records)->toHaveCount(2);
+    expect($dataset->cleaned_records)->toBe($dataset->original_records);
+    expect($dataset->profile['row_count'])->toBe(2);
 });
 
 // ─── Positive: XLSX Upload ──────────────────────────────────────────────────
@@ -76,18 +82,18 @@ test('valid xlsx upload creates dataset record', function () {
 
     $user = User::factory()->create();
 
-    $spreadsheet = new Spreadsheet;
-    $sheet = $spreadsheet->getActiveSheet();
-    $sheet->setCellValue('A1', 'Name');
-    $sheet->setCellValue('B1', 'Age');
-    $sheet->setCellValue('A2', 'Alice');
-    $sheet->setCellValue('B2', '28');
+    Excel::store(new class implements FromArray
+    {
+        public function array(): array
+        {
+            return [
+                ['Name', 'Age'],
+                ['Alice', '28'],
+            ];
+        }
+    }, 'test.xlsx', 'local', ExcelReader::XLSX);
 
-    $tempPath = sys_get_temp_dir().'/test_'.uniqid().'.xlsx';
-    $writer = new Xlsx($spreadsheet);
-    $writer->save($tempPath);
-
-    register_shutdown_function(fn () => @unlink($tempPath));
+    $tempPath = Storage::disk('local')->path('test.xlsx');
 
     $file = new UploadedFile(
         $tempPath,
@@ -199,20 +205,18 @@ test('missing file returns validation error', function () {
 // ─── Positive: Dataset Preview Page ─────────────────────────────────────────
 
 test('dataset preview page displays correct metadata', function () {
+    $this->withoutVite();
+
     $user = User::factory()->create();
 
-    $dataset = Dataset::create([
+    $dataset = Dataset::factory()->create([
         'uploaded_by_id' => $user->id,
         'original_name' => 'sample.csv',
-        'disk_path' => 'datasets/1/sample.csv',
-        'mime_type' => 'text/csv',
-        'size_bytes' => 1024,
-        'preview' => [
-            'headers' => ['Name', 'Age'],
-            'sample_rows' => [['John', '30'], ['Jane', '25']],
-            'row_count' => 2,
-            'column_count' => 2,
-        ],
+        'headers' => ['Name', 'Age'],
+        'row_count' => 2,
+        'column_count' => 2,
+        'original_records' => [['Name' => 'John', 'Age' => '30'], ['Name' => 'Jane', 'Age' => '25']],
+        'cleaned_records' => [['Name' => 'John', 'Age' => '30'], ['Name' => 'Jane', 'Age' => '25']],
     ]);
 
     $response = $this
@@ -236,18 +240,9 @@ test('dataset preview returns 404 for wrong user', function () {
     $userA = User::factory()->create();
     $userB = User::factory()->create();
 
-    $dataset = Dataset::create([
+    $dataset = Dataset::factory()->create([
         'uploaded_by_id' => $userA->id,
         'original_name' => 'user_a_file.csv',
-        'disk_path' => 'datasets/1/file.csv',
-        'mime_type' => 'text/csv',
-        'size_bytes' => 100,
-        'preview' => [
-            'headers' => ['X'],
-            'sample_rows' => [['1']],
-            'row_count' => 1,
-            'column_count' => 1,
-        ],
     ]);
 
     $response = $this

@@ -1,7 +1,21 @@
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Clock, Columns3, Database, HardDrive, Rows3 } from 'lucide-react';
+import {
+    ArrowLeft,
+    Clock,
+    Columns3,
+    Database,
+    HardDrive,
+    Rows3,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
+import AttributePanel from '@/components/datasets/attribute-panel';
+import ChartPanel from '@/components/datasets/chart-panel';
+import CleaningPanel from '@/components/datasets/cleaning-panel';
+import DatasetPreviewTable from '@/components/datasets/dataset-preview-table';
+import ProfilePanel from '@/components/datasets/profile-panel';
+import SelectedColumnProfile from '@/components/datasets/selected-column-profile';
+import WorkflowSteps from '@/components/datasets/workflow-steps';
 import Heading from '@/components/heading';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { DatasetPageProps } from '@/types/datasets';
@@ -17,269 +31,121 @@ function formatBytes(bytes: number): string {
 
     const units = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    const size = parseFloat(
-        (bytes / Math.pow(1024, i)).toFixed(1),
-    );
+    const size = parseFloat((bytes / Math.pow(1024, i)).toFixed(1));
 
     return `${size} ${units[i]}`;
 }
 
 function formatDate(isoString: string): string {
-    const date = new Date(isoString);
-
-    return date.toLocaleDateString('en-US', {
+    return new Date(isoString).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
     });
 }
 
-function getMimeBadge(mimeType: string | null): string {
-    if (!mimeType) {
-        return 'Unknown';
-    }
-
-    if (mimeType.includes('csv')) {
-        return 'CSV';
-    }
-
-    if (mimeType.includes('xls')) {
-        return mimeType.includes('xlsx') ? 'XLSX' : 'XLS';
-    }
-
-    return 'File';
-}
-
-function guessColumnType(
-    values: (string | number | boolean | null)[],
-): string {
-    const nonNull = values.filter((v) => v !== null && v !== '');
-
-    if (nonNull.length === 0) {
-        return 'Empty';
-    }
-
-    const allNumeric = nonNull.every(
-        (v) =>
-            typeof v === 'number' ||
-            (typeof v === 'string' &&
-                v.trim() !== '' &&
-                !isNaN(Number(v))),
-    );
-
-    if (allNumeric) {
-        return 'Numeric';
-    }
-
-    const allBoolean = nonNull.every(
-        (v) =>
-            typeof v === 'boolean' ||
-            (typeof v === 'string' &&
-                ['true', 'false', '0', '1'].includes(v.toLowerCase())),
-    );
-
-    if (allBoolean) {
-        return 'Boolean';
-    }
-
-    const datePattern = /^\d{4}-\d{2}-\d{2}/;
-    const allDate = nonNull.every(
-        (v) => typeof v === 'string' && datePattern.test(v),
-    );
-
-    if (allDate) {
-        return 'Date';
-    }
-
-    return 'Text';
-}
-
 export default function Show({ dataset }: Props) {
-
-    const hasPreviewRows = dataset.previewRows.length > 0;
-
-    const columnValues = (header: string) =>
-        dataset.previewRows.map((row) => row[header]);
+    const [selectedColumn, setSelectedColumn] = useState(
+        dataset.selectedColumn ?? dataset.headers[0] ?? null,
+    );
+    const selectedColumnProfile = useMemo(
+        () =>
+            dataset.profile?.columns.find(
+                (column) => column.name === selectedColumn,
+            ) ?? dataset.selectedColumnProfile,
+        [
+            dataset.profile?.columns,
+            dataset.selectedColumnProfile,
+            selectedColumn,
+        ],
+    );
+    const summaryCards = [
+        {
+            label: 'Rows',
+            value: dataset.rowCount.toLocaleString(),
+            icon: Rows3,
+        },
+        {
+            label: 'Columns',
+            value: dataset.columnCount.toString(),
+            icon: Columns3,
+        },
+        {
+            label: 'Size',
+            value: formatBytes(dataset.sizeBytes),
+            icon: HardDrive,
+        },
+        {
+            label: 'Type',
+            value: (dataset.extension ?? 'file').toUpperCase(),
+            icon: Database,
+        },
+        {
+            label: 'Uploaded',
+            value: formatDate(dataset.createdAt),
+            icon: Clock,
+        },
+    ];
 
     return (
         <>
             <Head title={dataset.originalName} />
 
             <div className="flex flex-col space-y-6">
-                <Heading
-                    variant="small"
-                    title={dataset.originalName}
-                    description="Dataset preview"
-                />
+                <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+                    <Heading
+                        variant="small"
+                        title={dataset.originalName}
+                        description="Workspace flow: inspect columns, clean the working copy, and generate recommended charts while preserving the original upload."
+                    />
 
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <Rows3 className="h-5 w-5 shrink-0 text-muted-foreground" />
-                            <div className="min-w-0">
-                                <p className="text-xs text-muted-foreground">
-                                    Rows
-                                </p>
-                                <p className="truncate text-sm font-medium">
-                                    {dataset.rowCount.toLocaleString()}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <Columns3 className="h-5 w-5 shrink-0 text-muted-foreground" />
-                            <div className="min-w-0">
-                                <p className="text-xs text-muted-foreground">
-                                    Columns
-                                </p>
-                                <p className="truncate text-sm font-medium">
-                                    {dataset.columnCount}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <HardDrive className="h-5 w-5 shrink-0 text-muted-foreground" />
-                            <div className="min-w-0">
-                                <p className="text-xs text-muted-foreground">
-                                    Size
-                                </p>
-                                <p className="truncate text-sm font-medium">
-                                    {formatBytes(dataset.sizeBytes)}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <Database className="h-5 w-5 shrink-0 text-muted-foreground" />
-                            <div className="min-w-0">
-                                <p className="text-xs text-muted-foreground">
-                                    Type
-                                </p>
-                                <Badge
-                                    variant="secondary"
-                                    className="mt-0.5 text-xs"
-                                >
-                                    {getMimeBadge(dataset.mimeType)}
-                                </Badge>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <Clock className="h-5 w-5 shrink-0 text-muted-foreground" />
-                            <div className="min-w-0">
-                                <p className="text-xs text-muted-foreground">
-                                    Uploaded
-                                </p>
-                                <p className="truncate text-sm font-medium">
-                                    {formatDate(dataset.createdAt)}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-xs text-muted-foreground">
-                                File
-                            </p>
-                            <p className="truncate text-sm font-medium">
-                                {dataset.originalName}
-                            </p>
-                        </CardContent>
-                    </Card>
+                    <Button asChild variant="secondary">
+                        <Link href="/datasets">
+                            <ArrowLeft className="mr-2 size-4" />
+                            Back to datasets
+                        </Link>
+                    </Button>
                 </div>
 
-                <Card>
-                    <CardContent className="p-0">
-                        {hasPreviewRows ? (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="sticky top-0 bg-muted">
-                                        <tr>
-                                            {dataset.headers.map(
-                                                (header) => (
-                                                    <th
-                                                        key={header}
-                                                        className="whitespace-nowrap px-4 py-2 text-left font-medium"
-                                                    >
-                                                        {header}
-                                                        <Badge
-                                                            variant="secondary"
-                                                            className="ml-2 text-xs"
-                                                        >
-                                                            {guessColumnType(
-                                                                columnValues(
-                                                                    header,
-                                                                ),
-                                                            )}
-                                                        </Badge>
-                                                    </th>
-                                                ),
-                                            )}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {dataset.previewRows.map(
-                                            (row, i) => (
-                                                <tr
-                                                    key={i}
-                                                    className="border-t hover:bg-muted/50"
-                                                >
-                                                    {dataset.headers.map(
-                                                        (header) => (
-                                                            <td
-                                                                key={header}
-                                                                className="whitespace-nowrap px-4 py-2"
-                                                            >
-                                                                {String(
-                                                                    row[
-                                                                        header
-                                                                    ] ?? '',
-                                                                )}
-                                                            </td>
-                                                        ),
-                                                    )}
-                                                </tr>
-                                            ),
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <div className="p-6 text-center text-muted-foreground">
-                                No preview data available.
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                <WorkflowSteps current="Visualize" />
 
-                <div>
-                    <Link
-                        href="/datasets"
-                    >
-                        <Button variant="secondary">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back to Upload
-                        </Button>
-                    </Link>
+                <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
+                    {summaryCards.map((card) => (
+                        <Card key={card.label}>
+                            <CardContent className="flex items-center gap-3 p-4">
+                                <card.icon className="size-5 shrink-0 text-[#284B63]" />
+                                <div className="min-w-0">
+                                    <p className="text-xs text-muted-foreground">
+                                        {card.label}
+                                    </p>
+                                    <p className="truncate text-sm font-medium text-[#353535]">
+                                        {card.value}
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
                 </div>
+
+                <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+                    <AttributePanel
+                        columns={dataset.profile?.columns ?? []}
+                        selectedColumn={selectedColumn}
+                        onSelectColumn={setSelectedColumn}
+                    />
+                    <SelectedColumnProfile column={selectedColumnProfile} />
+                </div>
+
+                <DatasetPreviewTable dataset={dataset} />
+                <ProfilePanel profile={dataset.profile} />
+                <CleaningPanel dataset={dataset} />
+                <ChartPanel dataset={dataset} />
             </div>
         </>
     );
 }
 
-Show.layout = (props: {
-    dataset: DatasetPageProps;
-}) => ({
+Show.layout = (props: { dataset: DatasetPageProps }) => ({
     breadcrumbs: [
         {
             title: 'Datasets',

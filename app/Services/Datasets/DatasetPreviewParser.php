@@ -2,310 +2,159 @@
 
 namespace App\Services\Datasets;
 
-use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
-use PhpOffice\PhpSpreadsheet\Exception;
-use PhpOffice\PhpSpreadsheet\IOFactory;
-use PhpOffice\PhpSpreadsheet\Reader\Csv as CsvReader;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use App\Imports\Datasets\DatasetRowsImport;
+use Maatwebsite\Excel\Excel as ExcelReader;
+use Maatwebsite\Excel\Facades\Excel;
+use Throwable;
 
 class DatasetPreviewParser
 {
-    private const int MAX_SAMPLE_ROWS = 10;
-
-    private const array COMMON_DELIMITERS = [',', ';', "\t"];
+    private const int MAX_SAMPLE_ROWS = 15;
 
     /**
-     * Parse a CSV or Excel file and return preview data.
+     * Parse a CSV or Excel file into normalized records and preview metadata.
      *
-     * @return array{headers: string[], sample_rows: array<array<mixed>>, row_count: int, column_count: int}
-     *
-     * @throws \InvalidArgumentException If the file is empty or has invalid headers.
-     * @throws \RuntimeException If the file cannot be read or parsed.
+     * @return array{headers: list<string>, records: list<array<string, mixed>>, sample_rows: list<array<string, mixed>>, row_count: int, column_count: int}
      */
-    public function parse(string $filePath): array
+    public function parse(string $filePath, ?string $extension = null): array
     {
-        if (! file_exists($filePath)) {
-            throw new \RuntimeException('The uploaded file could not be found.');
+        if (! is_file($filePath) || ! is_readable($filePath)) {
+            throw new \RuntimeException('The uploaded file could not be found or read.');
         }
 
+        $readerType = $this->readerType($extension ?? pathinfo($filePath, PATHINFO_EXTENSION));
+        $import = new DatasetRowsImport;
+
         try {
-            $spreadsheet = $this->loadSpreadsheet($filePath);
-        } catch (Exception $e) {
+            Excel::import($import, $filePath, null, $readerType);
+        } catch (Throwable $e) {
             throw new \RuntimeException(
                 'Unable to read the file. It may be corrupt or in an unsupported format.',
                 0,
-                $e
+                $e,
             );
         }
 
-        $worksheet = $spreadsheet->getActiveSheet();
+        $rows = $this->trimTrailingEmptyRows($import->rows());
 
-        $this->ensureNotEmpty($worksheet);
+        if ($rows === []) {
+            throw new \InvalidArgumentException('The dataset is empty. Please upload a file with headers and data.');
+        }
 
-        $headers = $this->extractHeaders($worksheet);
-
+        $headers = $this->normalizeHeaders(array_shift($rows) ?? []);
         $this->validateHeaders($headers);
 
-        ['row_count' => $rowCount, 'sample_rows' => $sampleRows] = $this->collectDataRows($worksheet);
-        $columnCount = count($headers);
+        $records = $this->normalizeRecords($headers, $rows);
 
         return [
             'headers' => $headers,
-            'sample_rows' => $sampleRows,
-            'row_count' => $rowCount,
-            'column_count' => $columnCount,
+            'records' => $records,
+            'sample_rows' => array_slice($records, 0, self::MAX_SAMPLE_ROWS),
+            'row_count' => count($records),
+            'column_count' => count($headers),
         ];
     }
 
-    /**
-     * Load a spreadsheet using the appropriate reader based on file extension.
-     *
-     * Falls back to IOFactory::load() for unknown extensions.
-     */
-    private function loadSpreadsheet(string $filePath): Spreadsheet
+    private function readerType(string $extension): string
     {
-        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-
-        if ($extension === 'csv') {
-            return $this->loadCsv($filePath);
-        }
-
-        if ($extension === 'xlsx') {
-            return $this->loadExcel($filePath, 'Xlsx');
-        }
-
-        if ($extension === 'xls') {
-            return $this->loadExcel($filePath, 'Xls');
-        }
-
-        // Fallback: auto-detect the file type
-        $spreadsheet = IOFactory::load($filePath);
-
-        if (! ($spreadsheet instanceof Spreadsheet)) {
-            throw new \RuntimeException('Unable to read the file. Unsupported format.');
-        }
-
-        return $spreadsheet;
+        return match (strtolower($extension)) {
+            'csv' => ExcelReader::CSV,
+            'xls' => ExcelReader::XLS,
+            'xlsx' => ExcelReader::XLSX,
+            default => throw new \InvalidArgumentException('Invalid file format. Please upload a CSV or Excel file.'),
+        };
     }
 
     /**
-     * Load a CSV file with auto-detected encoding and delimiter.
+     * @param  array<int, array<int, mixed>>  $rows
+     * @return array<int, array<int, mixed>>
      */
-    private function loadCsv(string $filePath): Spreadsheet
+    private function trimTrailingEmptyRows(array $rows): array
     {
-        $reader = new CsvReader;
-        $reader->setInputEncoding(CsvReader::GUESS_ENCODING);
-        $reader->setFallbackEncoding('UTF-8');
-
-        $delimiter = $this->detectCsvDelimiter($filePath);
-        $reader->setDelimiter($delimiter);
-
-        return $reader->load($filePath);
+        return array_values(array_filter($rows, fn (array $row): bool => ! $this->isEmptyRow($row)));
     }
 
     /**
-     * Load an Excel file (Xlsx or Xls) with read-data-only for memory efficiency.
+     * @param  array<int, mixed>  $row
      */
-    private function loadExcel(string $filePath, string $type): Spreadsheet
+    private function isEmptyRow(array $row): bool
     {
-        $reader = IOFactory::createReader($type);
-        $reader->setReadDataOnly(true);
-
-        return $reader->load($filePath);
-    }
-
-    /**
-     * Detect the delimiter used in a CSV file by sniffing the first few lines.
-     *
-     * Counts occurrences of common delimiters (comma, semicolon, tab) across
-     * the first 5 non-empty lines and picks the one with the highest count.
-     */
-    private function detectCsvDelimiter(string $filePath): string
-    {
-        $handle = fopen($filePath, 'r');
-
-        if (! $handle) {
-            return ',';
-        }
-
-        $lines = [];
-        $lineCount = 0;
-
-        while (($line = fgets($handle)) !== false && $lineCount < 5) {
-            $line = trim($line);
-
-            if ($line !== '') {
-                $lines[] = $line;
-                $lineCount++;
+        foreach ($row as $value) {
+            if (! $this->isBlank($value)) {
+                return false;
             }
         }
 
-        fclose($handle);
-
-        if (empty($lines)) {
-            return ',';
-        }
-
-        $bestDelimiter = ',';
-        $bestCount = 0;
-
-        foreach (self::COMMON_DELIMITERS as $delimiter) {
-            $count = 0;
-
-            foreach ($lines as $line) {
-                $count += substr_count($line, $delimiter);
-            }
-
-            if ($count > $bestCount) {
-                $bestCount = $count;
-                $bestDelimiter = $delimiter;
-            }
-        }
-
-        return $bestDelimiter;
+        return true;
     }
 
     /**
-     * Ensure the spreadsheet is not empty.
-     *
-     * Checks the entire first row (not just A1) for any content
-     * to avoid false positives when only the first cell is blank.
-     *
-     * @throws \InvalidArgumentException If the file has no data rows.
+     * @param  array<int, mixed>  $headerRow
+     * @return list<string>
      */
-    private function ensureNotEmpty(Worksheet $worksheet): void
+    private function normalizeHeaders(array $headerRow): array
     {
-        $highestDataRow = $worksheet->getHighestDataRow();
-
-        if ($highestDataRow < 1) {
-            throw new \InvalidArgumentException('The dataset is empty. Please upload a file with data.');
-        }
-
-        // When only one row exists, check the full row for any content
-        if ($highestDataRow === 1) {
-            $highestDataColumn = $worksheet->getHighestDataColumn();
-            $firstRow = $worksheet->rangeToArray(
-                "A1:{$highestDataColumn}1",
-                null,
-                false,
-                false
-            )[0] ?? [];
-
-            $hasContent = false;
-
-            foreach ($firstRow as $cell) {
-                if ($cell !== null && trim((string) $cell) !== '') {
-                    $hasContent = true;
-
-                    break;
-                }
-            }
-
-            if (! $hasContent) {
-                throw new \InvalidArgumentException('The dataset is empty. Please upload a file with data.');
-            }
-        }
+        return array_values(array_map(fn (mixed $value): string => trim((string) $value), $headerRow));
     }
 
     /**
-     * Extract column headers from the first row of the worksheet.
-     *
-     * @return string[] Trimmed header values.
-     */
-    private function extractHeaders(Worksheet $worksheet): array
-    {
-        $highestDataColumn = $worksheet->getHighestDataColumn();
-        $headerRange = "A1:{$highestDataColumn}1";
-
-        $headerRow = $worksheet->rangeToArray($headerRange, null, false, false)[0] ?? [];
-
-        return array_map(function ($value): string {
-            return trim((string) $value);
-        }, $headerRow);
-    }
-
-    /**
-     * Validate that headers are not blank and contain no duplicates.
-     *
-     * @param  string[]  $headers
-     *
-     * @throws \InvalidArgumentException If any header is blank or duplicates exist.
+     * @param  list<string>  $headers
      */
     private function validateHeaders(array $headers): void
     {
-        if (empty($headers)) {
+        if ($headers === []) {
             throw new \InvalidArgumentException('The dataset has no column headers.');
         }
 
-        $lowerHeaders = array_map('strtolower', $headers);
         $seen = [];
-        $originalDuplicates = [];
+        $duplicates = [];
 
-        foreach ($lowerHeaders as $index => $lower) {
-            $original = $headers[$index];
-
-            if ($original === '') {
+        foreach ($headers as $header) {
+            if ($header === '') {
                 throw new \InvalidArgumentException('The dataset has blank column headers.');
             }
 
-            if (isset($seen[$lower])) {
-                $originalDuplicates[] = $original;
-            } else {
-                $seen[$lower] = true;
+            $key = mb_strtolower($header);
+
+            if (isset($seen[$key])) {
+                $duplicates[] = $header;
             }
+
+            $seen[$key] = true;
         }
 
-        if (! empty($originalDuplicates)) {
-            throw new \InvalidArgumentException(
-                'The dataset has duplicate column headers: '.implode(', ', $originalDuplicates)
-            );
+        if ($duplicates !== []) {
+            throw new \InvalidArgumentException('The dataset has duplicate column headers: '.implode(', ', $duplicates));
         }
     }
 
     /**
-     * Collect data rows using a memory-efficient generator.
-     *
-     * Only stores the first 10 rows as sample data; counts total rows
-     * by iterating through the generator.
-     *
-     * @return array{row_count: int, sample_rows: array<array<mixed>>}
+     * @param  list<string>  $headers
+     * @param  array<int, array<int, mixed>>  $rows
+     * @return list<array<string, mixed>>
      */
-    private function collectDataRows(Worksheet $worksheet): array
+    private function normalizeRecords(array $headers, array $rows): array
     {
-        $highestDataColumn = $worksheet->getHighestDataColumn();
-        $highestDataRow = $worksheet->getHighestDataRow();
-        $columnIndex = Coordinate::columnIndexFromString($highestDataColumn);
+        $records = [];
+        $columnCount = count($headers);
 
-        // No data rows beyond the header
-        if ($highestDataRow <= 1) {
-            return [
-                'row_count' => 0,
-                'sample_rows' => [],
-            ];
-        }
+        foreach ($rows as $row) {
+            $paddedRow = array_pad(array_slice($row, 0, $columnCount), $columnCount, null);
+            $record = [];
 
-        $range = "A2:{$highestDataColumn}{$highestDataRow}";
-
-        $rowGenerator = $worksheet->rangeToArrayYieldRows($range, null, false, false);
-
-        $sampleRows = [];
-        $rowCount = 0;
-
-        foreach ($rowGenerator as $row) {
-            // Pad row to match column count in case of trailing empty cells
-            $paddedRow = array_pad($row, $columnIndex, null);
-
-            if ($rowCount < self::MAX_SAMPLE_ROWS) {
-                $sampleRows[] = $paddedRow;
+            foreach ($headers as $index => $header) {
+                $value = $paddedRow[$index] ?? null;
+                $record[$header] = is_string($value) ? trim($value) : $value;
             }
 
-            $rowCount++;
+            $records[] = $record;
         }
 
-        return [
-            'row_count' => $rowCount,
-            'sample_rows' => $sampleRows,
-        ];
+        return $records;
+    }
+
+    private function isBlank(mixed $value): bool
+    {
+        return $value === null || (is_string($value) && trim($value) === '');
     }
 }

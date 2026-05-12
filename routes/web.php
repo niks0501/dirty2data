@@ -14,6 +14,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('datasets', [DatasetController::class, 'index'])->name('datasets.index');
     Route::post('datasets', [DatasetController::class, 'store'])->name('datasets.store');
     Route::get('datasets/{dataset}', [DatasetController::class, 'show'])->name('datasets.show');
+    Route::post('datasets/{dataset}/clean', [DatasetController::class, 'clean'])->name('datasets.clean');
+    Route::post('datasets/{dataset}/clean/preview', [DatasetController::class, 'previewClean'])->name('datasets.clean.preview');
+    Route::get('datasets/{dataset}/chart', [DatasetController::class, 'chart'])->name('datasets.chart');
 });
 
 require __DIR__.'/settings.php';

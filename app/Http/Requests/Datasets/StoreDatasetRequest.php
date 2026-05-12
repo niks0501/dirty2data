@@ -56,16 +56,16 @@ class StoreDatasetRequest extends FormRequest
 
                 try {
                     $parser = new DatasetPreviewParser;
-                    $parser->parse($file->getRealPath());
-                } catch (\InvalidArgumentException) {
+                    $parser->parse($file->getRealPath(), $file->getClientOriginalExtension());
+                } catch (\InvalidArgumentException $e) {
                     $validator->errors()->add(
                         'dataset_file',
-                        'The dataset file appears to be empty or has invalid headers.',
+                        $e->getMessage(),
                     );
-                } catch (\RuntimeException) {
+                } catch (\RuntimeException $e) {
                     $validator->errors()->add(
                         'dataset_file',
-                        'Unable to read the file. It may be corrupt or in an unsupported format.',
+                        $e->getMessage(),
                     );
                 }
             },
