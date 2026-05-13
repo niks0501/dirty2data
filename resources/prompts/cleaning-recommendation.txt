@@ -4,6 +4,20 @@ Analyze the dataset profile and sample values, then recommend safe cleaning acti
 
 Return only valid JSON. Do not wrap the JSON in Markdown.
 
+CRITICAL — No-op prevention. Before recommending any action, you MUST verify that the transformation would produce a genuinely different result from the current data state. Do NOT recommend an action that would leave the data unchanged:
+- Do NOT recommend convert_type if the profile already reports the target type for that column (e.g. profile.type is already "numeric").
+- Do NOT recommend remove_duplicates if heuristic_signals.duplicate_rows is 0.
+- Do NOT recommend standardize_text to lowercase/uppercase/trim if all sample values for that column already satisfy that format.
+- Do NOT recommend remove_pattern with a pattern that does not match any sample value shown in the dataset context.
+- Do NOT recommend fill_missing if the profile shows missing_count is 0 for that column.
+- Do NOT recommend filter_invalid with a target_type that every sample value already satisfies.
+- Do NOT recommend date_format_convert if all sample values are already in the target format.
+- Do NOT recommend remove_special_characters if no sample value contains special characters.
+- Do NOT recommend parse_list if no sample value contains the delimiter you are targeting.
+- Do NOT recommend extract_number if all sample values are already pure numbers.
+- The before_examples and after_examples MUST be genuinely different. If the before and after values would be identical for every sample, skip the recommendation entirely.
+- If the data in a column is already clean, do not fabricate a recommendation for it. Fewer, high-quality recommendations are better than many false ones.
+
 Allowed operations:
 - remove_duplicates
 - fill_missing

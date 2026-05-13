@@ -34,11 +34,14 @@ class DatasetCleaningRecommendationController extends Controller
         Dataset $dataset,
         DatasetAiContextBuilder $contextBuilder,
         CleaningRecommendationManager $manager,
+        DatasetCleaningPreviewer $previewer,
     ): JsonResponse {
         $this->authorizeDataset($request, $dataset);
 
         $context = $contextBuilder->build($dataset);
         $result = $manager->recommend($context, $dataset->headers ?? []);
+
+        $result['recommendations'] = $this->filterNoOpRecommendations($dataset, $result['recommendations'], $previewer);
 
         $dataset->cleaningRecommendations()
             ->where('status', 'suggested')
@@ -186,6 +189,29 @@ class DatasetCleaningRecommendationController extends Controller
         return response()->json([
             'recommendation' => $this->formatRecommendation($recommendation->fresh()),
         ]);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $recommendations
+     * @return list<array<string, mixed>>
+     */
+    private function filterNoOpRecommendations(Dataset $dataset, array $recommendations, DatasetCleaningPreviewer $previewer): array
+    {
+        return array_values(array_filter($recommendations, function (array $recommendation) use ($dataset, $previewer): bool {
+            $steps = $recommendation['suggested_steps'] ?? [];
+
+            if ($steps === []) {
+                return false;
+            }
+
+            try {
+                $preview = $previewer->previewPipeline($dataset, $steps);
+
+                return $preview['will_change_dataset'] === true;
+            } catch (\InvalidArgumentException) {
+                return false;
+            }
+        }));
     }
 
     private function authorizeDataset(Request $request, Dataset $dataset): void
