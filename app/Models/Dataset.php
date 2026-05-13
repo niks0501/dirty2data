@@ -6,6 +6,7 @@ use Database\Factories\DatasetFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Dataset extends Model
@@ -47,6 +48,27 @@ class Dataset extends Model
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by_id');
+    }
+
+    /**
+     * Get the quality scores associated with this dataset.
+     *
+     * @return HasMany<DatasetQualityScore, $this>
+     */
+    public function qualityScores(): HasMany
+    {
+        return $this->hasMany(DatasetQualityScore::class);
+    }
+
+    /**
+     * Get the latest 'before' quality score (pre-cleaning baseline).
+     */
+    public function latestBeforeQualityScore(): ?DatasetQualityScore
+    {
+        return $this->qualityScores()
+            ->where('score_type', 'before')
+            ->latest()
+            ->first();
     }
 
     /**

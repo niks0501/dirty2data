@@ -1,0 +1,14 @@
+README.md
+pyproject.toml
+app/__init__.py
+app/main.py
+app/parsing.py
+app/profiling.py
+app/quality_score.py
+app/schemas.py
+dirty2data_python_service.egg-info/PKG-INFO
+dirty2data_python_service.egg-info/SOURCES.txt
+dirty2data_python_service.egg-info/dependency_links.txt
+dirty2data_python_service.egg-info/requires.txt
+dirty2data_python_service.egg-info/top_level.txt
+tests/test_quality_score.py

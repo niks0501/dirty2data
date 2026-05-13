@@ -142,3 +142,47 @@ export interface DatasetPageProps {
     status: string;
     processing: DatasetProcessingStatus;
 }
+
+/** Shape of a single sub-score (0-100) in the breakdown. */
+export interface QualityBreakdownScore {
+    completeness: number;
+    uniqueness: number;
+    validity: number;
+    consistency: number;
+    type_accuracy: number;
+}
+
+/** Counts for detected dataset issues. */
+export interface QualityIssuesSummary {
+    missing_values: number;
+    duplicate_rows: number;
+    invalid_values: number;
+    inconsistent_columns: number;
+    type_issue_columns: number;
+}
+
+/** A single issue surfaced by the quality scoring engine. */
+export interface QualityIssue {
+    code: string;
+    severity: 'error' | 'warning' | 'info';
+    message: string;
+    column: string | null;
+    count: number | null;
+}
+
+/** A plain-language recommendation for improving data quality. */
+export interface QualityRecommendation {
+    code: string;
+    message: string;
+    recommended_action: string;
+}
+
+/** Deterministic data quality score returned after profiling. */
+export interface DatasetQualityScore {
+    quality_score: number;
+    status: string;
+    breakdown: QualityBreakdownScore;
+    issues_summary: QualityIssuesSummary;
+    issues: QualityIssue[];
+    recommendations: QualityRecommendation[];
+}

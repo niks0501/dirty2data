@@ -8,15 +8,18 @@ use App\Http\Requests\Datasets\CleanDatasetRequest;
 use App\Http\Requests\Datasets\StoreDatasetRequest;
 use App\Jobs\ProcessDatasetUpload;
 use App\Models\Dataset;
+use App\Models\DatasetQualityScore;
 use App\Services\Datasets\DatasetChartBuilder;
 use App\Services\Datasets\DatasetChartRecommender;
 use App\Services\Datasets\DatasetCleaner;
 use App\Services\Datasets\DatasetCleaningPreviewer;
 use App\Services\Datasets\DatasetPreviewParser;
 use App\Services\Datasets\DatasetProfiler;
+use App\Services\Datasets\DatasetQualityScoreClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -53,6 +56,7 @@ class DatasetController extends Controller
         StoreDatasetRequest $request,
         DatasetPreviewParser $parser,
         DatasetProfiler $profiler,
+        DatasetQualityScoreClient $scoreClient,
     ): RedirectResponse {
         $file = $request->file('dataset_file');
         $extension = $file->getClientOriginalExtension();
@@ -135,6 +139,8 @@ class DatasetController extends Controller
             'status' => 'ready',
         ]);
 
+        $this->requestQualityScore($dataset, $scoreClient);
+
         return to_route('datasets.show', [
             'dataset' => $dataset->id,
         ])->with('toast', [
@@ -181,7 +187,10 @@ class DatasetController extends Controller
 
         $previewNote = $dataset->preview['preview_note'] ?? null;
 
+        $qualityScore = $dataset->latestBeforeQualityScore();
+
         return Inertia::render('datasets/show', [
+            'qualityScore' => $this->formatQualityScore($qualityScore),
             'dataset' => [
                 'id' => $dataset->id,
                 'originalName' => $dataset->original_name,
@@ -307,6 +316,53 @@ class DatasetController extends Controller
     }
 
     /**
+     * Call the Python data processing service to calculate and persist the quality score.
+     *
+     * Errors are logged but do not block the upload flow — the dataset stays usable
+     * even if the Python service is temporarily unavailable.
+     */
+    private function requestQualityScore(Dataset $dataset, DatasetQualityScoreClient $scoreClient): void
+    {
+        try {
+            $filePath = Storage::disk('local')->path($dataset->disk_path);
+
+            $result = $scoreClient->score($filePath, $dataset->original_name);
+            $pm = $result['profile_metrics'] ?? [];
+            $bd = $result['breakdown'] ?? [];
+
+            DatasetQualityScore::create([
+                'dataset_id' => $dataset->id,
+                'score_type' => 'before',
+                'quality_score' => (int) round((float) ($result['final_score'] ?? 0)),
+                'status' => (string) ($result['status'] ?? 'Unknown'),
+                'completeness_score' => isset($bd['completeness']['score'])
+                    ? (float) $bd['completeness']['score'] : null,
+                'uniqueness_score' => isset($bd['uniqueness']['score'])
+                    ? (float) $bd['uniqueness']['score'] : null,
+                'validity_score' => isset($bd['validity']['score'])
+                    ? (float) $bd['validity']['score'] : null,
+                'consistency_score' => isset($bd['consistency']['score'])
+                    ? (float) $bd['consistency']['score'] : null,
+                'type_accuracy_score' => isset($bd['type_accuracy']['score'])
+                    ? (float) $bd['type_accuracy']['score'] : null,
+                'missing_values' => (int) ($pm['missing_cell_count'] ?? 0),
+                'duplicate_rows' => (int) ($pm['duplicate_count'] ?? 0),
+                'invalid_values' => (int) ($pm['invalid_cell_count'] ?? 0),
+                'inconsistent_columns' => 0,
+                'type_issue_columns' => 0,
+                'breakdown' => $bd ?: null,
+                'issues_summary' => $result['issues_summary'] ?? null,
+                'recommendation_summary' => $result['recommendation_summary'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Quality score calculation skipped.', [
+                'dataset_id' => $dataset->id,
+                'reason' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * @param  array<string, mixed>|null  $profile
      * @return array<string, mixed>|null
      */
@@ -323,5 +379,38 @@ class DatasetController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * Format a quality score model into the shape expected by the React frontend.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function formatQualityScore(?DatasetQualityScore $score): ?array
+    {
+        if (! $score) {
+            return null;
+        }
+
+        return [
+            'quality_score' => $score->quality_score,
+            'status' => $score->status,
+            'breakdown' => [
+                'completeness' => (float) $score->completeness_score,
+                'uniqueness' => (float) $score->uniqueness_score,
+                'validity' => (float) $score->validity_score,
+                'consistency' => (float) $score->consistency_score,
+                'type_accuracy' => (float) $score->type_accuracy_score,
+            ],
+            'issues_summary' => [
+                'missing_values' => (int) $score->missing_values,
+                'duplicate_rows' => (int) $score->duplicate_rows,
+                'invalid_values' => (int) $score->invalid_values,
+                'inconsistent_columns' => (int) $score->inconsistent_columns,
+                'type_issue_columns' => (int) $score->type_issue_columns,
+            ],
+            'issues' => $score->issues_summary,
+            'recommendations' => $score->recommendation_summary,
+        ];
     }
 }

@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'python_data_service' => [
+        'base_url' => env('PYTHON_DATA_SERVICE_BASE_URL', ''),
+        'timeout' => (int) env('PYTHON_DATA_SERVICE_TIMEOUT', 120),
+        'auth_token' => env('PYTHON_DATA_SERVICE_TOKEN'),
+    ],
+
 ];

@@ -25,12 +25,12 @@ export default function AttributePanel({
             <CardHeader className="shrink-0">
                 <CardTitle>Columns</CardTitle>
                 <CardDescription>
-                    Select a column to inspect its
-                    quality and chart recommendation.
+                    Select a column to inspect its quality and chart
+                    recommendation.
                 </CardDescription>
             </CardHeader>
 
-            <CardContent className="flex-1 space-y-2 overflow-y-auto min-h-0">
+            <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto">
                 {columns.length > 0 ? (
                     columns.map((column) => {
                         const hasIssue = column.missing_count > 0;

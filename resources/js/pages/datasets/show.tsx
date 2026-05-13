@@ -15,15 +15,17 @@ import ChartPanel from '@/components/datasets/chart-panel';
 import CleaningPanel from '@/components/datasets/cleaning-panel';
 import DatasetPreviewTable from '@/components/datasets/dataset-preview-table';
 import ProfilePanel from '@/components/datasets/profile-panel';
+import QualityScoreCard from '@/components/datasets/quality-score-card';
 import SelectedColumnProfile from '@/components/datasets/selected-column-profile';
 import WorkflowSteps from '@/components/datasets/workflow-steps';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import type { DatasetPageProps } from '@/types/datasets';
+import type { DatasetPageProps, DatasetQualityScore } from '@/types/datasets';
 
 interface Props {
     dataset: DatasetPageProps;
+    qualityScore: DatasetQualityScore | null;
 }
 
 function formatBytes(bytes: number): string {
@@ -60,7 +62,7 @@ function formatDateTime(isoString: string | null): string {
     });
 }
 
-export default function Show({ dataset }: Props) {
+export default function Show({ dataset, qualityScore }: Props) {
     const [currentDataset, setCurrentDataset] = useState(dataset);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -89,7 +91,7 @@ export default function Show({ dataset }: Props) {
 
         pollingRef.current = setInterval(() => {
             router.reload({
-                only: ['dataset'],
+                only: ['dataset', 'qualityScore'],
                 onSuccess: (page) => {
                     const updated = page.props.dataset as DatasetPageProps;
 
@@ -191,8 +193,8 @@ export default function Show({ dataset }: Props) {
                                         Processing Dataset
                                     </h2>
                                     <p className="text-sm text-muted-foreground">
-                                        Your file is being parsed and profiled in
-                                        the background. This page updates
+                                        Your file is being parsed and profiled
+                                        in the background. This page updates
                                         automatically.
                                     </p>
                                 </div>
@@ -279,11 +281,13 @@ export default function Show({ dataset }: Props) {
                             </div>
                         )}
 
+                        {qualityScore && (
+                            <QualityScoreCard score={qualityScore} />
+                        )}
+
                         <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
                             <AttributePanel
-                                columns={
-                                    currentDataset.profile?.columns ?? []
-                                }
+                                columns={currentDataset.profile?.columns ?? []}
                                 selectedColumn={selectedColumn}
                                 onSelectColumn={setSelectedColumn}
                             />

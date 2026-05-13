@@ -171,7 +171,8 @@ export default function Index({ datasets }: Props) {
                                             <p className="font-medium text-[#353535]">
                                                 {dataset.originalName}
                                             </p>
-                                            {dataset.status === 'processing' && (
+                                            {dataset.status ===
+                                                'processing' && (
                                                 <span className="flex items-center gap-1 rounded-full bg-[#E7F0F5] px-2 py-0.5 text-xs font-medium text-[#284B63]">
                                                     <Loader2 className="size-3 animate-spin" />
                                                     Processing

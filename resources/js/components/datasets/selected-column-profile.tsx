@@ -61,7 +61,7 @@ export default function SelectedColumnProfile({ column }: Props) {
                 </div>
             </CardHeader>
 
-            <CardContent className="flex-1 space-y-4 overflow-y-auto min-h-0">
+            <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto">
                 <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     {stats.map(([label, value]) => (
                         <div key={label} className="rounded-xl border p-2.5">
