@@ -207,6 +207,7 @@ class DatasetController extends Controller
                 'selectedColumn' => $isProcessing ? null : $selectedColumn,
                 'selectedColumnProfile' => $isProcessing ? null : $selectedColumnProfile,
                 'cleaningLog' => $dataset->cleaning_log ?? [],
+                'cleaningSnapshots' => $dataset->cleaning_snapshots ?? [],
                 'pagination' => [
                     'page' => $page,
                     'perPage' => $perPage,
@@ -236,6 +237,8 @@ class DatasetController extends Controller
     ): RedirectResponse {
         $this->authorizeDataset($request, $dataset);
 
+        $snapshots = $cleaner->pushSnapshot($dataset);
+
         try {
             $result = $cleaner->clean($dataset, $request->validated());
         } catch (\InvalidArgumentException $e) {
@@ -253,6 +256,7 @@ class DatasetController extends Controller
             'row_count' => count($result['records']),
             'profile' => $profile,
             'cleaning_log' => $log,
+            'cleaning_snapshots' => $snapshots,
         ]);
 
         return to_route('datasets.show', ['dataset' => $dataset])->with('toast', [

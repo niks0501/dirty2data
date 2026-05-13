@@ -7,11 +7,12 @@ use App\Models\Dataset;
 class DatasetCleaner
 {
     /**
+     * @param  list<array<string, mixed>>|null  $customRecords
      * @return array{records: list<array<string, mixed>>, log: array<string, mixed>, summary: array<string, mixed>}
      */
-    public function clean(Dataset $dataset, array $input): array
+    public function clean(Dataset $dataset, array $input, ?array $customRecords = null): array
     {
-        $records = $dataset->cleaned_records ?? [];
+        $records = $customRecords ?? ($dataset->cleaned_records ?? []);
         $operation = (string) ($input['operation'] ?? '');
 
         return match ($operation) {
@@ -343,6 +344,25 @@ class DatasetCleaner
         }
 
         return array_map(fn (mixed $value): float => (float) $value, $values);
+    }
+
+    /**
+     * Push the current cleaned_records onto the snapshots stack before a cleaning operation.
+     *
+     * @return list<list<array<string, mixed>>>
+     */
+    public function pushSnapshot(Dataset $dataset): array
+    {
+        $snapshots = $dataset->cleaning_snapshots ?? [];
+        $currentRecords = $dataset->cleaned_records ?? [];
+
+        array_unshift($snapshots, $currentRecords);
+
+        if (count($snapshots) > 10) {
+            $snapshots = array_slice($snapshots, 0, 10);
+        }
+
+        return $snapshots;
     }
 
     /**

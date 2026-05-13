@@ -60,6 +60,7 @@ class DatasetProfiler
             $profile['maximum'] = $numbers[array_key_last($numbers)] ?? null;
             $profile['average'] = $numbers === [] ? null : round(array_sum($numbers) / count($numbers), 4);
             $profile['median'] = $this->median($numbers);
+            $profile['outliers_iqr'] = $this->detectOutliersIqr($numbers);
         }
 
         if ($type === 'date') {
@@ -204,5 +205,47 @@ class DatasetProfiler
     private function detector(): DatasetTypeDetector
     {
         return $this->typeDetector ?? new DatasetTypeDetector;
+    }
+
+    /**
+     * @param  list<float>  $numbers
+     * @return array{count: int, lower_bound: float, upper_bound: float, q1: float, q3: float} | null
+     */
+    private function detectOutliersIqr(array $numbers): ?array
+    {
+        $count = count($numbers);
+
+        if ($count < 4) {
+            return null;
+        }
+
+        $q1Index = (int) floor(0.25 * ($count - 1));
+        $q3Index = (int) floor(0.75 * ($count - 1));
+        $q1 = $numbers[$q1Index];
+        $q3 = $numbers[$q3Index];
+        $iqr = $q3 - $q1;
+
+        if ($iqr <= 0) {
+            return null;
+        }
+
+        $lower = $q1 - 1.5 * $iqr;
+        $upper = $q3 + 1.5 * $iqr;
+
+        $outlierCount = 0;
+
+        foreach ($numbers as $number) {
+            if ($number < $lower || $number > $upper) {
+                $outlierCount++;
+            }
+        }
+
+        return [
+            'count' => $outlierCount,
+            'lower_bound' => round($lower, 4),
+            'upper_bound' => round($upper, 4),
+            'q1' => round($q1, 4),
+            'q3' => round($q3, 4),
+        ];
     }
 }

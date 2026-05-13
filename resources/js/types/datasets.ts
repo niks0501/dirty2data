@@ -44,6 +44,13 @@ export interface DatasetColumnProfile {
     maximum?: string | number | null;
     average?: number | null;
     median?: number | null;
+    outliers_iqr?: {
+        count: number;
+        lower_bound: number;
+        upper_bound: number;
+        q1: number;
+        q3: number;
+    } | null;
 }
 
 export interface DatasetProfile {
@@ -135,6 +142,7 @@ export interface DatasetPageProps {
     selectedColumn: string | null;
     selectedColumnProfile: DatasetColumnProfile | null;
     cleaningLog: CleaningLogEntry[];
+    cleaningSnapshots: Array<Record<string, DatasetValue>>[];
     pagination: DatasetPagination;
     chartRecommendations: DatasetChartRecommendation[];
     chart: DatasetChartPayload;

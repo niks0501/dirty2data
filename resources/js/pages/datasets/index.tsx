@@ -1,5 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FileSpreadsheet, Loader2, Upload } from 'lucide-react';
+import { FileSpreadsheet, Info, Loader2, Upload } from 'lucide-react';
+import { useState } from 'react';
 import AlertError from '@/components/alert-error';
 import WorkflowSteps from '@/components/datasets/workflow-steps';
 import Heading from '@/components/heading';
@@ -16,6 +17,13 @@ import type { DatasetSummary } from '@/types/datasets';
 
 interface Props {
     datasets: DatasetSummary[];
+}
+
+interface FilePreviewInfo {
+    headers: string[];
+    sampleRows: string[][];
+    rowCount: number;
+    format: string;
 }
 
 function formatFileSize(bytes: number): string {
@@ -38,10 +46,107 @@ function formatDate(isoString: string): string {
     });
 }
 
+function parseCsvPreview(file: File): Promise<FilePreviewInfo> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = () => {
+            const text = reader.result as string;
+            const lines = text.split(/\r?\n/).filter((line) => line.trim() !== '');
+
+            if (lines.length === 0) {
+                reject(new Error('The file appears to be empty.'));
+
+                return;
+            }
+
+            const headers = lines[0]
+                .split(',')
+                .map((h) => h.trim().replace(/^"|"$/g, ''));
+            const sampleRows = lines
+                .slice(1, 6)
+                .map((line) =>
+                    line
+                        .split(',')
+                        .map((cell) => cell.trim().replace(/^"|"$/g, '')),
+                );
+
+            resolve({
+                headers,
+                sampleRows,
+                rowCount: lines.length - 1,
+                format: file.name.endsWith('.csv')
+                    ? 'CSV'
+                    : file.name.endsWith('.xlsx')
+                      ? 'Excel (.xlsx)'
+                      : file.name.endsWith('.xls')
+                        ? 'Excel (.xls)'
+                        : 'Unknown',
+            });
+        };
+
+        reader.onerror = () => reject(new Error('Unable to read file.'));
+
+        if (
+            file.name.endsWith('.csv') ||
+            file.name.endsWith('.txt')
+        ) {
+            reader.readAsText(file);
+        } else {
+            resolve({
+                headers: [],
+                sampleRows: [],
+                rowCount: 0,
+                format: file.name.endsWith('.xlsx')
+                    ? 'Excel (.xlsx)'
+                    : file.name.endsWith('.xls')
+                      ? 'Excel (.xls)'
+                      : 'Unknown',
+            });
+        }
+    });
+}
+
 export default function Index({ datasets }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         dataset_file: null as File | null,
     });
+
+    const [preview, setPreview] = useState<FilePreviewInfo | null>(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
+
+    function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+        const file = event.target.files?.[0];
+
+        if (!file) {
+            setData('dataset_file', null);
+            setPreview(null);
+
+            return;
+        }
+
+        setData('dataset_file', file);
+
+        if (file.name.endsWith('.csv')) {
+            setPreviewLoading(true);
+
+            parseCsvPreview(file)
+                .then(setPreview)
+                .catch(() => setPreview(null))
+                .finally(() => setPreviewLoading(false));
+        } else {
+            setPreview({
+                headers: [],
+                sampleRows: [],
+                rowCount: 0,
+                format: file.name.endsWith('.xlsx')
+                    ? 'Excel (.xlsx)'
+                    : file.name.endsWith('.xls')
+                      ? 'Excel (.xls)'
+                      : 'Unknown',
+            });
+        }
+    }
 
     function handleSubmit(event: React.FormEvent) {
         event.preventDefault();
@@ -62,7 +167,7 @@ export default function Index({ datasets }: Props) {
                     description="Upload CSV or Excel files to begin the Upload → Profile → Clean → Analyze → Visualize workflow."
                 />
 
-                <WorkflowSteps current="Upload" />
+                <WorkflowSteps currentStep={0} />
 
                 {errorMessages.length > 0 && (
                     <AlertError errors={errorMessages} />
@@ -75,8 +180,7 @@ export default function Index({ datasets }: Props) {
                             <CardDescription>
                                 Accepted formats: CSV, XLSX, XLS. Maximum size:
                                 50MB. Files over 200,000 rows are processed in
-                                the background and will show progress on the
-                                dataset page.
+                                the background.
                             </CardDescription>
                         </CardHeader>
 
@@ -96,12 +200,24 @@ export default function Index({ datasets }: Props) {
                                             <FileSpreadsheet className="size-12 text-[#284B63]" />
                                             <div className="text-center">
                                                 <p className="font-medium text-[#353535]">
-                                                    {data.dataset_file.name}
+                                                    {
+                                                        data.dataset_file.name
+                                                    }
                                                 </p>
                                                 <p className="text-sm text-muted-foreground">
                                                     {formatFileSize(
                                                         data.dataset_file.size,
                                                     )}
+                                                    {preview &&
+                                                        preview.rowCount >
+                                                            0 && (
+                                                            <>
+                                                                {' '}
+                                                                · ~
+                                                                {preview.rowCount.toLocaleString()}{' '}
+                                                                rows
+                                                            </>
+                                                        )}
                                                 </p>
                                             </div>
                                         </>
@@ -127,20 +243,119 @@ export default function Index({ datasets }: Props) {
                                     type="file"
                                     accept=".csv,.xlsx,.xls"
                                     className="hidden"
-                                    onChange={(event) => {
-                                        const file = event.target.files?.[0];
-
-                                        if (file) {
-                                            setData('dataset_file', file);
-                                        }
-                                    }}
+                                    onChange={handleFileChange}
                                 />
+
+                                {previewLoading && (
+                                    <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                                        <Loader2 className="size-4 animate-spin" />
+                                        Reading file preview...
+                                    </div>
+                                )}
+
+                                {preview && !previewLoading && (
+                                    <div className="mt-4 space-y-3 rounded-lg border bg-white p-4">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-[#353535]">
+                                            <Info className="size-4 text-[#3C6E71]" />
+                                            File Preview
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                            <span className="rounded-full bg-[#E7F0F5] px-2 py-0.5 font-medium text-[#284B63]">
+                                                {preview.format}
+                                            </span>
+                                            {preview.rowCount > 0 && (
+                                                <>
+                                                    <span>
+                                                        {preview.rowCount.toLocaleString()}{' '}
+                                                        data rows
+                                                    </span>
+                                                    <span>
+                                                        {preview.headers.length}{' '}
+                                                        columns
+                                                    </span>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {preview.headers.length > 0 &&
+                                            preview.sampleRows.length > 0 && (
+                                                <div className="overflow-x-auto rounded-lg border">
+                                                    <table className="w-full text-xs">
+                                                        <thead className="bg-[#F1F3F4]">
+                                                            <tr>
+                                                                {preview.headers.map(
+                                                                    (
+                                                                        header,
+                                                                    ) => (
+                                                                        <th
+                                                                            key={
+                                                                                header
+                                                                            }
+                                                                            className="px-2 py-1.5 text-left font-semibold whitespace-nowrap text-[#353535]"
+                                                                        >
+                                                                            {
+                                                                                header
+                                                                            }
+                                                                        </th>
+                                                                    ),
+                                                                )}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {preview.sampleRows.map(
+                                                                (
+                                                                    row,
+                                                                    rowIdx,
+                                                                ) => (
+                                                                    <tr
+                                                                        key={
+                                                                            rowIdx
+                                                                        }
+                                                                        className="border-t"
+                                                                    >
+                                                                        {preview.headers.map(
+                                                                            (
+                                                                                _,
+                                                                                colIdx,
+                                                                            ) => (
+                                                                                <td
+                                                                                    key={
+                                                                                        colIdx
+                                                                                    }
+                                                                                    className="max-w-[150px] truncate px-2 py-1.5 whitespace-nowrap"
+                                                                                >
+                                                                                    {row[
+                                                                                        colIdx
+                                                                                    ] ??
+                                                                                        ''}
+                                                                                </td>
+                                                                            ),
+                                                                        )}
+                                                                    </tr>
+                                                                ),
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+
+                                        <p className="text-xs text-muted-foreground">
+                                            {preview.headers.length >
+                                            0
+                                                ? 'Preview shows the first few rows. Upload to see the full dataset with profiling and cleaning tools.'
+                                                : 'Excel files will be fully processed after upload.'}
+                                        </p>
+                                    </div>
+                                )}
                             </CardContent>
 
                             <CardFooter>
                                 <Button
                                     type="submit"
-                                    disabled={!data.dataset_file || processing}
+                                    disabled={
+                                        !data.dataset_file || processing
+                                    }
                                     className="w-full"
                                 >
                                     {processing
@@ -178,7 +393,8 @@ export default function Index({ datasets }: Props) {
                                                     Processing
                                                 </span>
                                             )}
-                                            {dataset.status === 'failed' && (
+                                            {dataset.status ===
+                                                'failed' && (
                                                 <span className="rounded-full bg-[#FDECEC] px-2 py-0.5 text-xs font-medium text-[#C62828]">
                                                     Failed
                                                 </span>

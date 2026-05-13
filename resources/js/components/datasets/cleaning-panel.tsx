@@ -1,5 +1,11 @@
 import { router } from '@inertiajs/react';
-import { CheckCircle2, Eye, Wand2 } from 'lucide-react';
+import {
+    CheckCircle2,
+    Eye,
+    HelpCircle,
+    Lightbulb,
+    Wand2,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +23,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type { CleaningPreview, DatasetPageProps } from '@/types/datasets';
 
 type CleaningOperation =
@@ -39,37 +50,83 @@ interface Props {
     dataset: DatasetPageProps;
 }
 
-const actions: Array<{
+interface ActionDefinition {
     operation: CleaningOperation;
     title: string;
     description: string;
-}> = [
+    whyDoThis: string;
+    whenToUse: string;
+    example: string;
+    studentTip: string;
+}
+
+const actionDefinitions: ActionDefinition[] = [
     {
         operation: 'remove_duplicates',
         title: 'Remove Duplicates',
         description: 'Keep the first copy of each repeated row.',
+        whyDoThis:
+            'Duplicate rows inflate your row count and can make averages, totals, and charts inaccurate. Removing them ensures each record represents a unique observation.',
+        whenToUse:
+            'When the same data row appears more than once — common after merging files from multiple sources or exporting reports that repeat data.',
+        example:
+            'If row 5 and row 47 have the same name, date, and value, this keeps row 5 and removes row 47.',
+        studentTip:
+            'Before removing, check if duplicates are legitimate (e.g., two students sharing a name in different sections) or truly repeated data.',
     },
     {
         operation: 'fill_missing',
         title: 'Fill Missing Values',
         description:
             'Replace blanks using mean, median, mode, or a custom value.',
+        whyDoThis:
+            'Blank cells break calculations, charts, and analysis. Filling them with sensible values (instead of deleting the row) preserves your data for reliable statistics.',
+        whenToUse:
+            'When you have missing cells in a column — especially numeric columns where you need to calculate averages, or categorical columns where blanks confuse grouping.',
+        example:
+            'A survey column where 10% of respondents skipped a question: fill with the most common answer (mode) to keep your dataset complete.',
+        studentTip:
+            'For school projects: use mean for symmetric data, median for data with outliers. Explain your choice — professors value justification over any single method.',
     },
     {
         operation: 'convert_type',
         title: 'Convert Data Type',
         description:
             'Convert values to numeric, text, date, or boolean format.',
+        whyDoThis:
+            'Numbers stored as text can\'t be used in calculations. Dates stored as text won\'t sort properly. Correct types enable charts, stats, and analysis to work.',
+        whenToUse:
+            'When a column shows numbers left-aligned (stored as text) or dates that don\'t sort chronologically — common when importing from Excel or CSV exports.',
+        example:
+            'A "Price" column showing "$10.00" as text: convert to numeric (10.00) so you can calculate totals and averages.',
+        studentTip:
+            'If your chart won\'t render or stats show "N/A," check that the column type is correct. This is the #1 cause of "why isn\'t my chart working?"',
     },
     {
         operation: 'standardize_text',
         title: 'Standardize Text Format',
         description: 'Trim text and normalize case for cleaner categories.',
+        whyDoThis:
+            'Inconsistent text ("Male" vs "male" vs "MALE" vs " male ") creates fake duplicate categories, splitting what should be a single group into many.',
+        whenToUse:
+            'When categorical columns (gender, department, country) show too many unique values or when sorting looks wrong because of mixed case.',
+        example:
+            'A "Department" column with "Engineering," "engineering," and " ENGINEERING" treated as three separate categories. Standardizing merges them.',
+        studentTip:
+            'Always trim whitespace first — invisible trailing spaces are the silent killer of data analysis. Then standardize case.',
     },
     {
         operation: 'filter_invalid',
         title: 'Filter Invalid Rows',
         description: 'Remove rows that do not match the expected column type.',
+        whyDoThis:
+            'Invalid data (letters in a number column, dates in a text field that should be names) can corrupt your analysis and produce wrong conclusions.',
+        whenToUse:
+            "When a column should contain only numeric/date values but some rows have text or empty values that can't be fixed by conversion.",
+        example:
+            'An "Age" column where someone typed "twenty-five" instead of 25. Filter removes the row so your age statistics stay accurate.',
+        studentTip:
+            'Review filtered rows before removing them. Sometimes invalid data is actually correct data in an unexpected format (e.g., "N/A" might mean "Not Applicable," not missing).',
     },
 ];
 
@@ -77,13 +134,6 @@ function csrfToken(): string {
     return (
         document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
             ?.content ?? ''
-    );
-}
-
-function operationLabel(operation: string): string {
-    return (
-        actions.find((action) => action.operation === operation)?.title ??
-        'Cleaning Action'
     );
 }
 
@@ -99,6 +149,8 @@ export default function CleaningPanel({ dataset }: Props) {
     const [preview, setPreview] = useState<CleaningPreview | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [previewing, setPreviewing] = useState(false);
+    const [expandedAction, setExpandedAction] =
+        useState<CleaningOperation>('remove_duplicates');
 
     function updateConfig<Key extends keyof CleaningConfig>(
         key: Key,
@@ -139,12 +191,8 @@ export default function CleaningPanel({ dataset }: Props) {
     function applyCleaning() {
         router.post(
             `/datasets/${dataset.id}/clean`,
-            {
-                ...config,
-            },
-            {
-                preserveScroll: true,
-            },
+            { ...config },
+            { preserveScroll: true },
         );
     }
 
@@ -156,17 +204,19 @@ export default function CleaningPanel({ dataset }: Props) {
             <CardHeader>
                 <CardTitle>Clean</CardTitle>
                 <CardDescription>
-                    Choose a beginner-friendly cleaning action, preview the
-                    expected changes, then apply it to the cleaned working copy.
-                    The original upload remains unchanged.
+                    Choose a beginner-friendly cleaning action. Each operation
+                    explains what it does, when to use it, and why it helps your
+                    data.
                 </CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-5">
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                    {actions.map((action) => {
+                    {actionDefinitions.map((action) => {
                         const isSelected =
                             action.operation === config.operation;
+                        const isExpanded =
+                            action.operation === expandedAction;
 
                         return (
                             <button
@@ -178,9 +228,10 @@ export default function CleaningPanel({ dataset }: Props) {
                                         ? 'border-[#284B63] bg-[#E7F0F5]'
                                         : 'hover:bg-[#F7F9FA]',
                                 ].join(' ')}
-                                onClick={() =>
-                                    updateConfig('operation', action.operation)
-                                }
+                                onClick={() => {
+                                    updateConfig('operation', action.operation);
+                                    setExpandedAction(action.operation);
+                                }}
                             >
                                 <div className="mb-2 flex items-center gap-2 font-semibold text-[#353535]">
                                     <Wand2 className="size-4 text-[#3C6E71]" />
@@ -189,6 +240,29 @@ export default function CleaningPanel({ dataset }: Props) {
                                 <p className="text-sm text-muted-foreground">
                                     {action.description}
                                 </p>
+
+                                {isExpanded && (
+                                    <div className="mt-3 space-y-2 border-t pt-3">
+                                        <div className="flex items-start gap-1.5">
+                                            <HelpCircle className="mt-0.5 size-3.5 shrink-0 text-[#3C6E71]" />
+                                            <p className="text-xs text-[#353535]">
+                                                <span className="font-semibold">
+                                                    Why?
+                                                </span>{' '}
+                                                {action.whyDoThis}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-start gap-1.5">
+                                            <Lightbulb className="mt-0.5 size-3.5 shrink-0 text-[#F59E0B]" />
+                                            <p className="text-xs text-[#353535]">
+                                                <span className="font-semibold">
+                                                    Student Tip:
+                                                </span>{' '}
+                                                {action.studentTip}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </button>
                         );
                     })}
@@ -200,23 +274,36 @@ export default function CleaningPanel({ dataset }: Props) {
                             <label className="text-sm font-medium">
                                 Column
                             </label>
-                            <Select
-                                value={config.column}
-                                onValueChange={(value) =>
-                                    updateConfig('column', value)
-                                }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Column" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {dataset.headers.map((header) => (
-                                        <SelectItem key={header} value={header}>
-                                            {header}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Select
+                                        value={config.column}
+                                        onValueChange={(value) =>
+                                            updateConfig('column', value)
+                                        }
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Column" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {dataset.headers.map((header) => (
+                                                <SelectItem
+                                                    key={header}
+                                                    value={header}
+                                                >
+                                                    {header}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    <p className="text-xs">
+                                        Choose which column to apply this
+                                        cleaning action to.
+                                    </p>
+                                </TooltipContent>
+                            </Tooltip>
                         </div>
                     )}
 
@@ -226,33 +313,68 @@ export default function CleaningPanel({ dataset }: Props) {
                                 <label className="text-sm font-medium">
                                     Fill method
                                 </label>
-                                <Select
-                                    value={config.method}
-                                    onValueChange={(value) =>
-                                        updateConfig('method', value)
-                                    }
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Method" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="mean">
-                                            Mean
-                                        </SelectItem>
-                                        <SelectItem value="median">
-                                            Median
-                                        </SelectItem>
-                                        <SelectItem value="mode">
-                                            Mode
-                                        </SelectItem>
-                                        <SelectItem value="custom">
-                                            Custom value
-                                        </SelectItem>
-                                        <SelectItem value="blank">
-                                            Blank replacement
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Select
+                                            value={config.method}
+                                            onValueChange={(value) =>
+                                                updateConfig('method', value)
+                                            }
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="Method" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="mean">
+                                                    Mean (average)
+                                                </SelectItem>
+                                                <SelectItem value="median">
+                                                    Median (middle value)
+                                                </SelectItem>
+                                                <SelectItem value="mode">
+                                                    Mode (most common)
+                                                </SelectItem>
+                                                <SelectItem value="custom">
+                                                    Custom value
+                                                </SelectItem>
+                                                <SelectItem value="blank">
+                                                    Blank replacement
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                        side="top"
+                                        className="max-w-[260px]"
+                                    >
+                                        <div className="text-xs">
+                                            <p className="font-semibold">
+                                                Which method to choose:
+                                            </p>
+                                            <ul className="mt-1 list-disc space-y-0.5 pl-3">
+                                                <li>
+                                                    <strong>Mean:</strong> Best
+                                                    for symmetric data without
+                                                    outliers.
+                                                </li>
+                                                <li>
+                                                    <strong>Median:</strong>{' '}
+                                                    Best when your data has
+                                                    extreme values.
+                                                </li>
+                                                <li>
+                                                    <strong>Mode:</strong> Use
+                                                    for categories (e.g.,
+                                                    gender, department).
+                                                </li>
+                                                <li>
+                                                    <strong>Custom:</strong>{' '}
+                                                    Type any value you prefer.
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </TooltipContent>
+                                </Tooltip>
                             </div>
                             {config.method === 'custom' && (
                                 <div className="space-y-2">
@@ -349,14 +471,33 @@ export default function CleaningPanel({ dataset }: Props) {
                 {preview && (
                     <div className="space-y-3 rounded-xl border bg-[#F7F9FA] p-4">
                         <div className="flex items-start gap-2">
-                            <CheckCircle2 className="mt-0.5 size-4 text-[#2E7D32]" />
-                            <div>
+                            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#2E7D32]" />
+                            <div className="space-y-1">
                                 <h3 className="font-semibold text-[#353535]">
-                                    Preview: {operationLabel(preview.operation)}
+                                    Preview:{' '}
+                                    {
+                                        actionDefinitions.find(
+                                            (a) =>
+                                                a.operation ===
+                                                preview.operation,
+                                        )?.title
+                                    }
                                 </h3>
                                 <p className="text-sm text-muted-foreground">
                                     {preview.message}
                                 </p>
+                                {preview.will_change_dataset && (
+                                    <p className="flex items-center gap-1.5 text-sm font-medium text-[#0284C7]">
+                                        <Lightbulb className="size-3.5" />
+                                        This action will modify{' '}
+                                        {preview.affected_count.toLocaleString()}{' '}
+                                        row
+                                        {preview.affected_count !== 1
+                                            ? 's'
+                                            : ''}
+                                        . Click &quot;Apply&quot; to confirm.
+                                    </p>
+                                )}
                             </div>
                         </div>
 
@@ -365,8 +506,8 @@ export default function CleaningPanel({ dataset }: Props) {
                                 <table className="w-full text-sm">
                                     <thead className="bg-[#F1F3F4]">
                                         <tr>
-                                            <th className="px-3 py-2 text-left">
-                                                Row
+                                            <th className="w-12 px-3 py-2 text-left">
+                                                #
                                             </th>
                                             <th className="px-3 py-2 text-left">
                                                 Status
@@ -385,17 +526,38 @@ export default function CleaningPanel({ dataset }: Props) {
                                                 key={`${row.row_number}-${row.status}`}
                                                 className="border-t"
                                             >
-                                                <td className="px-3 py-2">
+                                                <td className="px-3 py-2 text-muted-foreground">
                                                     {row.row_number}
                                                 </td>
-                                                <td className="px-3 py-2 capitalize">
-                                                    {row.status}
+                                                <td className="px-3 py-2">
+                                                    <span
+                                                        className={[
+                                                            'inline-block rounded-full px-2 py-0.5 text-xs font-medium',
+                                                            row.status ===
+                                                            'removed'
+                                                                ? 'bg-[#FDECEC] text-[#C62828]'
+                                                                : row.status ===
+                                                                    'added'
+                                                                  ? 'bg-[#E8F5E9] text-[#2E7D32]'
+                                                                  : 'bg-[#E0F2FE] text-[#0284C7]',
+                                                        ].join(' ')}
+                                                    >
+                                                        {row.status}
+                                                    </span>
                                                 </td>
                                                 <td className="max-w-[280px] truncate px-3 py-2">
-                                                    {JSON.stringify(row.before)}
+                                                    {row.before
+                                                        ? formatRowForPreview(
+                                                              row.before,
+                                                          )
+                                                        : '—'}
                                                 </td>
                                                 <td className="max-w-[280px] truncate px-3 py-2">
-                                                    {JSON.stringify(row.after)}
+                                                    {row.after
+                                                        ? formatRowForPreview(
+                                                              row.after,
+                                                          )
+                                                        : '—'}
                                                 </td>
                                             </tr>
                                         ))}
@@ -403,9 +565,17 @@ export default function CleaningPanel({ dataset }: Props) {
                                 </table>
                             </div>
                         ) : (
-                            <p className="text-sm text-muted-foreground">
-                                No row-level changes were found for this action.
-                            </p>
+                            <div className="rounded-lg bg-[#F1F3F4] p-4 text-center text-sm text-muted-foreground">
+                                <p>
+                                    No row-level changes were found for this
+                                    action.
+                                </p>
+                                <p className="mt-1 text-xs">
+                                    The data may already be in the desired state,
+                                    or the operation may not apply to the
+                                    selected column.
+                                </p>
+                            </div>
                         )}
                     </div>
                 )}
@@ -428,7 +598,26 @@ export default function CleaningPanel({ dataset }: Props) {
                         Apply to cleaned dataset
                     </Button>
                 </div>
+
+                <div className="rounded-lg bg-[#E0F2FE] p-3 text-sm text-[#0284C7]">
+                    <Lightbulb className="mb-1 inline size-3.5 align-middle" />{' '}
+                    <strong>Remember:</strong> Cleaning changes only the working
+                    copy. Your original uploaded file is preserved and never
+                    modified. You can always re-upload to start fresh.
+                </div>
             </CardContent>
         </Card>
     );
+}
+
+function formatRowForPreview(
+    row: Record<string, string | number | boolean | null>,
+): string {
+    const entries = Object.entries(row);
+
+    if (entries.length <= 2) {
+        return entries.map(([k, v]) => `${k}: ${v ?? ''}`).join(', ');
+    }
+
+    return JSON.stringify(row);
 }

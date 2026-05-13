@@ -12,11 +12,15 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AttributePanel from '@/components/datasets/attribute-panel';
 import ChartPanel from '@/components/datasets/chart-panel';
+import CleaningAuditLog from '@/components/datasets/cleaning-audit-log';
 import CleaningPanel from '@/components/datasets/cleaning-panel';
 import DatasetPreviewTable from '@/components/datasets/dataset-preview-table';
 import ProfilePanel from '@/components/datasets/profile-panel';
 import QualityScoreCard from '@/components/datasets/quality-score-card';
+import RecipePanel from '@/components/datasets/recipe-panel';
 import SelectedColumnProfile from '@/components/datasets/selected-column-profile';
+import UndoToolbar from '@/components/datasets/undo-toolbar';
+import WorkflowGuide from '@/components/datasets/workflow-guide';
 import WorkflowSteps from '@/components/datasets/workflow-steps';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
@@ -68,6 +72,13 @@ export default function Show({ dataset, qualityScore }: Props) {
 
     const isProcessing = currentDataset.status === 'processing';
     const isFailed = currentDataset.status === 'failed';
+
+    const currentStep =
+        isProcessing || isFailed
+            ? 0
+            : (currentDataset.cleaningLog?.length ?? 0) > 0
+              ? 2
+              : 1;
 
     const [selectedColumn, setSelectedColumn] = useState(
         currentDataset.selectedColumn ?? currentDataset.headers[0] ?? null,
@@ -163,7 +174,9 @@ export default function Show({ dataset, qualityScore }: Props) {
                     </Button>
                 </div>
 
-                <WorkflowSteps current="Visualize" />
+                <WorkflowSteps currentStep={currentStep} />
+
+                <WorkflowGuide currentStep={currentStep} />
 
                 <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
                     {summaryCards.map((card) => (
@@ -298,7 +311,18 @@ export default function Show({ dataset, qualityScore }: Props) {
 
                         <DatasetPreviewTable dataset={currentDataset} />
                         <ProfilePanel profile={currentDataset.profile} />
+                        <UndoToolbar
+                            datasetId={currentDataset.id}
+                            cleaningLog={currentDataset.cleaningLog}
+                            snapshotCount={
+                                currentDataset.cleaningSnapshots?.length ?? 0
+                            }
+                        />
                         <CleaningPanel dataset={currentDataset} />
+                        <CleaningAuditLog
+                            log={currentDataset.cleaningLog}
+                        />
+                        <RecipePanel dataset={currentDataset} />
                         <ChartPanel dataset={currentDataset} />
                     </>
                 )}

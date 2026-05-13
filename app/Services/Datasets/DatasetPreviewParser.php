@@ -105,6 +105,8 @@ class DatasetPreviewParser
             throw new \RuntimeException('Unable to open the CSV file for reading.');
         }
 
+        $this->stripBom($handle);
+
         $headerRow = fgetcsv($handle);
 
         if ($headerRow === false || $headerRow === null) {
@@ -169,6 +171,8 @@ class DatasetPreviewParser
         if (! $handle) {
             throw new \RuntimeException('Unable to open the CSV file for reading.');
         }
+
+        $this->stripBom($handle);
 
         $headerRow = fgetcsv($handle);
 
@@ -456,5 +460,19 @@ class DatasetPreviewParser
     private function isBlank(mixed $value): bool
     {
         return $value === null || (is_string($value) && trim($value) === '');
+    }
+
+    /**
+     * Strip UTF-8 BOM (Byte Order Mark) from the beginning of a file handle.
+     *
+     * @param  resource  $handle
+     */
+    private function stripBom($handle): void
+    {
+        $bom = fread($handle, 3);
+
+        if ($bom !== "\xEF\xBB\xBF") {
+            fseek($handle, 0);
+        }
     }
 }

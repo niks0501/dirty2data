@@ -60,7 +60,7 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                <WorkflowSteps current="Upload" />
+                <WorkflowSteps currentStep={0} />
 
                 <div className="grid gap-4 md:grid-cols-3">
                     {cards.map((card) => (
