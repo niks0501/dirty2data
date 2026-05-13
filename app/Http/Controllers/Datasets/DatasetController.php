@@ -8,6 +8,7 @@ use App\Http\Requests\Datasets\CleanDatasetRequest;
 use App\Http\Requests\Datasets\StoreDatasetRequest;
 use App\Jobs\ProcessDatasetUpload;
 use App\Models\Dataset;
+use App\Models\DatasetCleaningRecommendation;
 use App\Models\DatasetQualityScore;
 use App\Services\Datasets\DatasetChartBuilder;
 use App\Services\Datasets\DatasetChartRecommender;
@@ -208,6 +209,12 @@ class DatasetController extends Controller
                 'selectedColumnProfile' => $isProcessing ? null : $selectedColumnProfile,
                 'cleaningLog' => $dataset->cleaning_log ?? [],
                 'cleaningSnapshots' => $dataset->cleaning_snapshots ?? [],
+                'cleaningRecommendations' => $dataset->cleaningRecommendations()
+                    ->latest()
+                    ->limit(20)
+                    ->get()
+                    ->map(fn (DatasetCleaningRecommendation $recommendation): array => $this->formatCleaningRecommendation($recommendation))
+                    ->values(),
                 'pagination' => [
                     'page' => $page,
                     'perPage' => $perPage,
@@ -247,13 +254,16 @@ class DatasetController extends Controller
             ]);
         }
 
-        $profile = $profiler->profile($result['records'], $dataset->headers ?? []);
+        $headers = $result['headers'] ?? ($dataset->headers ?? []);
+        $profile = $profiler->profile($result['records'], $headers);
         $log = $dataset->cleaning_log ?? [];
         $log[] = $result['log'];
 
         $dataset->update([
+            'headers' => $headers,
             'cleaned_records' => $result['records'],
             'row_count' => count($result['records']),
+            'column_count' => count($headers),
             'profile' => $profile,
             'cleaning_log' => $log,
             'cleaning_snapshots' => $snapshots,
@@ -415,6 +425,30 @@ class DatasetController extends Controller
             ],
             'issues' => $score->issues_summary,
             'recommendations' => $score->recommendation_summary,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formatCleaningRecommendation(DatasetCleaningRecommendation $recommendation): array
+    {
+        return [
+            'id' => $recommendation->id,
+            'rec_id' => $recommendation->rec_id,
+            'provider' => $recommendation->provider,
+            'model' => $recommendation->model,
+            'status' => $recommendation->status,
+            'column_name' => $recommendation->column_name,
+            'issue' => $recommendation->issue,
+            'severity' => $recommendation->severity,
+            'confidence' => $recommendation->confidence,
+            'risk' => $recommendation->risk,
+            'suggested_steps' => $recommendation->suggested_steps ?? [],
+            'before_examples' => $recommendation->before_examples ?? [],
+            'after_examples' => $recommendation->after_examples ?? [],
+            'reason' => $recommendation->reason,
+            'created_at' => $recommendation->created_at?->toISOString(),
         ];
     }
 }

@@ -30,6 +30,28 @@ class DatasetCleaningPreviewer
     }
 
     /**
+     * @param  list<array<string, mixed>>  $steps
+     * @return array<string, mixed>
+     */
+    public function previewPipeline(Dataset $dataset, array $steps): array
+    {
+        $before = $dataset->cleaned_records ?? [];
+        $result = $this->cleaner->cleanPipeline($dataset, $steps);
+        $after = $result['records'];
+
+        return [
+            'operation' => 'pipeline',
+            'summary' => $result['summary'],
+            'message' => count($steps).' recommended cleaning steps will be previewed as one approved action.',
+            'affected_count' => $this->affectedCount($result['summary']),
+            'changed_rows' => $this->changedRows($before, $after),
+            'will_change_dataset' => $before !== $after,
+            'steps' => $steps,
+            'step_logs' => $result['logs'],
+        ];
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $before
      * @param  list<array<string, mixed>>  $after
      * @return list<array<string, mixed>>
@@ -80,7 +102,7 @@ class DatasetCleaningPreviewer
      */
     private function affectedCount(array $summary): int
     {
-        foreach (['removed_rows', 'filled_cells', 'converted_cells', 'standardized_cells'] as $key) {
+        foreach (['affected_rows', 'affected_cells', 'removed_rows', 'filled_cells', 'converted_cells', 'standardized_cells', 'replaced_cells', 'pattern_removed_cells', 'extracted_cells', 'parsed_cells', 'cleaned_cells', 'split_rows', 'merged_rows'] as $key) {
             if (isset($summary[$key]) && is_numeric($summary[$key])) {
                 return (int) $summary[$key];
             }
@@ -100,6 +122,17 @@ class DatasetCleaningPreviewer
             'convert_type' => ($summary['converted_cells'] ?? 0).' values will be converted to '.($summary['target_type'] ?? 'the selected type').'.',
             'standardize_text' => ($summary['standardized_cells'] ?? 0).' text values will be standardized.',
             'filter_invalid' => ($summary['removed_rows'] ?? 0).' invalid rows will be removed.',
+            'replace_values' => ($summary['replaced_cells'] ?? 0).' matching values will be replaced.',
+            'remove_pattern' => ($summary['pattern_removed_cells'] ?? 0).' values will have the pattern removed.',
+            'extract_number' => ($summary['extracted_cells'] ?? 0).' values will be reduced to their numeric part.',
+            'split_column' => ($summary['split_rows'] ?? 0).' rows will be split into new columns.',
+            'parse_list' => ($summary['parsed_cells'] ?? 0).' list-like values will be standardized.',
+            'rename_column' => 'The selected column will be renamed.',
+            'remove_column' => 'The selected column will be removed from the working copy.',
+            'merge_columns' => ($summary['merged_rows'] ?? 0).' rows will receive merged column values.',
+            'numeric_range_filter' => ($summary['removed_rows'] ?? 0).' rows outside the numeric range will be removed.',
+            'date_format_convert' => ($summary['converted_cells'] ?? 0).' dates will be reformatted.',
+            'remove_special_characters' => ($summary['cleaned_cells'] ?? 0).' values will have special characters removed.',
             default => 'The selected cleaning action will be previewed.',
         };
     }

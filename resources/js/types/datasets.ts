@@ -64,6 +64,35 @@ export interface CleaningLogEntry {
     operation: string;
     applied_at: string;
     summary: Record<string, DatasetValue>;
+    column?: string | null;
+    source?: 'manual' | 'ai_recommendation' | string;
+    recommendation_id?: number | null;
+    explanation?: string | null;
+    steps?: CleaningLogEntry[];
+}
+
+export interface CleaningRecommendationStep {
+    operation: string;
+    column: string;
+    parameters: Record<string, DatasetValue | string[] | number[]>;
+}
+
+export interface DatasetCleaningRecommendation {
+    id: number;
+    rec_id: string | null;
+    provider: string;
+    model: string | null;
+    status: 'suggested' | 'accepted' | 'rejected' | 'applied' | 'expired';
+    column_name: string | null;
+    issue: string;
+    severity: 'low' | 'medium' | 'high';
+    confidence: number;
+    risk: 'low' | 'medium' | 'high';
+    suggested_steps: CleaningRecommendationStep[];
+    before_examples: string[];
+    after_examples: string[];
+    reason: string | null;
+    created_at: string | null;
 }
 
 export interface CleaningPreviewRowChange {
@@ -80,6 +109,10 @@ export interface CleaningPreview {
     affected_count: number;
     changed_rows: CleaningPreviewRowChange[];
     will_change_dataset: boolean;
+    risk?: string;
+    reason?: string | null;
+    recommendation_id?: number;
+    steps?: CleaningRecommendationStep[];
 }
 
 export interface DatasetPagination {
@@ -143,6 +176,7 @@ export interface DatasetPageProps {
     selectedColumnProfile: DatasetColumnProfile | null;
     cleaningLog: CleaningLogEntry[];
     cleaningSnapshots: Array<Record<string, DatasetValue>>[];
+    cleaningRecommendations: DatasetCleaningRecommendation[];
     pagination: DatasetPagination;
     chartRecommendations: DatasetChartRecommendation[];
     chart: DatasetChartPayload;

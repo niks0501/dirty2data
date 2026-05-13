@@ -52,7 +52,9 @@ function parseCsvPreview(file: File): Promise<FilePreviewInfo> {
 
         reader.onload = () => {
             const text = reader.result as string;
-            const lines = text.split(/\r?\n/).filter((line) => line.trim() !== '');
+            const lines = text
+                .split(/\r?\n/)
+                .filter((line) => line.trim() !== '');
 
             if (lines.length === 0) {
                 reject(new Error('The file appears to be empty.'));
@@ -87,10 +89,7 @@ function parseCsvPreview(file: File): Promise<FilePreviewInfo> {
 
         reader.onerror = () => reject(new Error('Unable to read file.'));
 
-        if (
-            file.name.endsWith('.csv') ||
-            file.name.endsWith('.txt')
-        ) {
+        if (file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
             reader.readAsText(file);
         } else {
             resolve({
@@ -200,9 +199,7 @@ export default function Index({ datasets }: Props) {
                                             <FileSpreadsheet className="size-12 text-[#284B63]" />
                                             <div className="text-center">
                                                 <p className="font-medium text-[#353535]">
-                                                    {
-                                                        data.dataset_file.name
-                                                    }
+                                                    {data.dataset_file.name}
                                                 </p>
                                                 <p className="text-sm text-muted-foreground">
                                                     {formatFileSize(
@@ -341,8 +338,7 @@ export default function Index({ datasets }: Props) {
                                             )}
 
                                         <p className="text-xs text-muted-foreground">
-                                            {preview.headers.length >
-                                            0
+                                            {preview.headers.length > 0
                                                 ? 'Preview shows the first few rows. Upload to see the full dataset with profiling and cleaning tools.'
                                                 : 'Excel files will be fully processed after upload.'}
                                         </p>
@@ -353,9 +349,7 @@ export default function Index({ datasets }: Props) {
                             <CardFooter>
                                 <Button
                                     type="submit"
-                                    disabled={
-                                        !data.dataset_file || processing
-                                    }
+                                    disabled={!data.dataset_file || processing}
                                     className="w-full"
                                 >
                                     {processing
@@ -393,8 +387,7 @@ export default function Index({ datasets }: Props) {
                                                     Processing
                                                 </span>
                                             )}
-                                            {dataset.status ===
-                                                'failed' && (
+                                            {dataset.status === 'failed' && (
                                                 <span className="rounded-full bg-[#FDECEC] px-2 py-0.5 text-xs font-medium text-[#C62828]">
                                                     Failed
                                                 </span>

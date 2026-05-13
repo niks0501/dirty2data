@@ -18,6 +18,18 @@ const operationLabels: Record<string, string> = {
     convert_type: 'Converted data type',
     standardize_text: 'Standardized text',
     filter_invalid: 'Filtered invalid rows',
+    replace_values: 'Replaced values',
+    remove_pattern: 'Removed pattern',
+    extract_number: 'Extracted numbers',
+    split_column: 'Split column',
+    parse_list: 'Parsed list values',
+    rename_column: 'Renamed column',
+    remove_column: 'Removed column',
+    merge_columns: 'Merged columns',
+    numeric_range_filter: 'Filtered numeric range',
+    date_format_convert: 'Converted date format',
+    remove_special_characters: 'Removed special characters',
+    ai_recommendation_pipeline: 'Applied AI recommendation',
 };
 
 export default function CleaningAuditLog({ log }: Props) {
@@ -58,18 +70,55 @@ export default function CleaningAuditLog({ log }: Props) {
         });
 
     const summaryLabels: Record<string, string> = {
-        duplicates_removed: 'Duplicates removed',
+        removed_rows: 'Rows removed',
+        affected_rows: 'Rows affected',
+        affected_cells: 'Cells affected',
+        removed_columns: 'Columns removed',
+        renamed_columns: 'Columns renamed',
+        replaced_cells: 'Cells replaced',
+        pattern_removed_cells: 'Pattern removals',
+        extracted_cells: 'Numbers extracted',
+        split_rows: 'Rows split',
+        parsed_cells: 'List cells parsed',
+        merged_rows: 'Rows merged',
+        cleaned_cells: 'Cells cleaned',
+        converted_cells: 'Converted cells',
+        standardized_cells: 'Standardized cells',
+        filled_cells: 'Filled cells',
+        steps: 'Steps applied',
+        step_summaries: 'Step summaries',
         rows_before: 'Rows before',
         rows_after: 'Rows after',
-        rows_removed: 'Rows removed',
-        filled_count: 'Filled cells',
         fill_method: 'Method',
         column: 'Column',
-        convert_count: 'Converted cells',
         target_type: 'Target type',
+        text_format: 'Text format',
         format: 'Format applied',
-        standardized_count: 'Standardized cells',
-        invalid_removed: 'Invalid rows removed',
+        method: 'Method',
+        replacement: 'Replacement',
+        search_value: 'Find value',
+        replacement_value: 'Replacement value',
+        pattern: 'Pattern',
+        delimiter: 'Delimiter',
+        output_delimiter: 'Output separator',
+        new_columns: 'New columns',
+        new_column: 'New column',
+        columns: 'Columns',
+        min: 'Minimum',
+        max: 'Maximum',
+        date_format: 'Date format',
+    };
+
+    const formatSummaryValue = (value: unknown): string => {
+        if (Array.isArray(value)) {
+            return `${value.length} item${value.length === 1 ? '' : 's'}`;
+        }
+
+        if (value && typeof value === 'object') {
+            return JSON.stringify(value);
+        }
+
+        return String(value);
     };
 
     return (
@@ -120,12 +169,15 @@ export default function CleaningAuditLog({ log }: Props) {
                                                         className="text-xs"
                                                     >
                                                         <span className="text-muted-foreground">
-                                                            {summaryLabels[key] ??
-                                                                key}
+                                                            {summaryLabels[
+                                                                key
+                                                            ] ?? key}
                                                             :
                                                         </span>{' '}
                                                         <span className="font-medium text-[#353535]">
-                                                            {String(value)}
+                                                            {formatSummaryValue(
+                                                                value,
+                                                            )}
                                                         </span>
                                                     </div>
                                                 ),

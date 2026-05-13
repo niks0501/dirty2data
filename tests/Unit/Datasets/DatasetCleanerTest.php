@@ -84,3 +84,86 @@ test('dataset cleaner filters invalid rows by selected type', function () {
         ['Age' => '30'],
     ])->and($result['summary']['removed_rows'])->toBe(2);
 });
+
+test('dataset cleaner removes bracket references and converts numeric values in a pipeline', function () {
+    $dataset = new Dataset([
+        'headers' => ['Peak'],
+        'cleaned_records' => [
+            ['Peak' => '7[2]'],
+            ['Peak' => '1[4]'],
+        ],
+    ]);
+
+    $result = (new DatasetCleaner)->cleanPipeline($dataset, [
+        [
+            'operation' => 'remove_pattern',
+            'column' => 'Peak',
+            'parameters' => ['pattern' => '\\[[^\\]]*\\]'],
+        ],
+        [
+            'operation' => 'convert_type',
+            'column' => 'Peak',
+            'parameters' => ['target_type' => 'numeric'],
+        ],
+    ]);
+
+    expect($result['records'])->toBe([
+        ['Peak' => 7.0],
+        ['Peak' => 1.0],
+    ])->and($result['summary']['steps'])->toBe(2)
+        ->and($result['summary']['affected_cells'])->toBe(4);
+});
+
+test('dataset cleaner extracts numbers from currency strings', function () {
+    $dataset = new Dataset([
+        'headers' => ['Revenue'],
+        'cleaned_records' => [
+            ['Revenue' => '$780,000,000'],
+            ['Revenue' => 'about 42'],
+        ],
+    ]);
+
+    $result = (new DatasetCleaner)->clean($dataset, [
+        'operation' => 'extract_number',
+        'column' => 'Revenue',
+    ]);
+
+    expect($result['records'])->toBe([
+        ['Revenue' => '780000000'],
+        ['Revenue' => '42'],
+    ])->and($result['summary']['extracted_cells'])->toBe(2);
+});
+
+test('dataset cleaner supports schema-changing split rename and remove operations', function () {
+    $dataset = new Dataset([
+        'headers' => ['Location', 'Notes'],
+        'cleaned_records' => [
+            ['Location' => 'Manila, Philippines', 'Notes' => 'keep'],
+        ],
+    ]);
+
+    $split = (new DatasetCleaner)->clean($dataset, [
+        'operation' => 'split_column',
+        'column' => 'Location',
+        'delimiter' => ',',
+        'new_columns' => 'City, Country',
+    ]);
+
+    $renamed = (new DatasetCleaner)->clean($dataset, [
+        'operation' => 'rename_column',
+        'column' => 'Notes',
+        'new_column' => 'Comment',
+    ], $split['records'], $split['headers']);
+
+    $removed = (new DatasetCleaner)->clean($dataset, [
+        'operation' => 'remove_column',
+        'column' => 'Location',
+    ], $renamed['records'], $renamed['headers']);
+
+    expect($removed['headers'])->toBe(['Comment', 'City', 'Country'])
+        ->and($removed['records'][0])->toBe([
+            'City' => 'Manila',
+            'Country' => 'Philippines',
+            'Comment' => 'keep',
+        ]);
+});

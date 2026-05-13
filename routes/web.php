@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Datasets\CleaningRecipeController;
+use App\Http\Controllers\Datasets\DatasetCleaningRecommendationController;
 use App\Http\Controllers\Datasets\DatasetController;
 use App\Http\Controllers\Datasets\DatasetUndoController;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +19,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('datasets/{dataset}', [DatasetController::class, 'show'])->name('datasets.show');
     Route::post('datasets/{dataset}/clean', [DatasetController::class, 'clean'])->name('datasets.clean');
     Route::post('datasets/{dataset}/clean/preview', [DatasetController::class, 'previewClean'])->name('datasets.clean.preview');
+    Route::get('datasets/{dataset}/cleaning/recommendations', [DatasetCleaningRecommendationController::class, 'index'])->name('datasets.cleaning.recommendations.index');
+    Route::post('datasets/{dataset}/cleaning/recommendations/generate', [DatasetCleaningRecommendationController::class, 'generate'])
+        ->name('datasets.cleaning.recommendations.generate')
+        ->middleware('throttle:5,10');
+    Route::post('datasets/{dataset}/cleaning/recommendations/{recommendation}/preview', [DatasetCleaningRecommendationController::class, 'preview'])->name('datasets.cleaning.recommendations.preview');
+    Route::post('datasets/{dataset}/cleaning/recommendations/{recommendation}/apply', [DatasetCleaningRecommendationController::class, 'apply'])->name('datasets.cleaning.recommendations.apply');
+    Route::post('datasets/{dataset}/cleaning/recommendations/{recommendation}/reject', [DatasetCleaningRecommendationController::class, 'reject'])->name('datasets.cleaning.recommendations.reject');
     Route::get('datasets/{dataset}/chart', [DatasetController::class, 'chart'])->name('datasets.chart');
 
     Route::post('datasets/{dataset}/undo', [DatasetUndoController::class, 'undoLast'])->name('datasets.undo');

@@ -109,6 +109,7 @@ export default [
         ignores: [
             'vendor',
             'node_modules',
+            'python-service/.venv/**',
             'public',
             'bootstrap/ssr',
             'tailwind.config.js',

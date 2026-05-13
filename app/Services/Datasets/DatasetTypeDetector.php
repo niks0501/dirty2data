@@ -35,7 +35,15 @@ class DatasetTypeDetector
 
     public function isBlank(mixed $value): bool
     {
-        return $value === null || (is_string($value) && trim($value) === '');
+        if ($value === null) {
+            return true;
+        }
+
+        if (! is_string($value)) {
+            return false;
+        }
+
+        return in_array(mb_strtolower(trim($value)), ['', 'n/a', 'na', 'null', 'none', 'missing', 'unknown', '-', '--', '[]'], true);
     }
 
     public function isBooleanLike(mixed $value): bool

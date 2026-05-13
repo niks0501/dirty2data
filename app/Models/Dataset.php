@@ -62,6 +62,16 @@ class Dataset extends Model
     }
 
     /**
+     * Get AI-assisted cleaning recommendations for this dataset.
+     *
+     * @return HasMany<DatasetCleaningRecommendation, $this>
+     */
+    public function cleaningRecommendations(): HasMany
+    {
+        return $this->hasMany(DatasetCleaningRecommendation::class);
+    }
+
+    /**
      * Get the latest 'before' quality score (pre-cleaning baseline).
      */
     public function latestBeforeQualityScore(): ?DatasetQualityScore

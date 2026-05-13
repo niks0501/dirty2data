@@ -55,11 +55,11 @@ const stepGuides = [
         step: 'Analyze',
         icon: 'Analyze',
         objective:
-            'Review data quality scores and understand your dataset\'s strengths and weaknesses.',
+            "Review data quality scores and understand your dataset's strengths and weaknesses.",
         whatYouLearn: [
             'How data quality is measured (completeness, uniqueness, validity, consistency, type accuracy)',
             'How to interpret recommendations and prioritize fixes',
-            'How to compare your dataset\'s quality against standards',
+            "How to compare your dataset's quality against standards",
         ],
         academicNote:
             'Quality scores help you quantify how "clean" your data is — useful for methodology sections and defense presentations.',
@@ -75,7 +75,7 @@ const stepGuides = [
             'How to read correlation coefficients and distributions',
         ],
         academicNote:
-            'Choose charts that answer your research question. A good visualization tells a story — don\'t just create charts for the sake of it.',
+            "Choose charts that answer your research question. A good visualization tells a story — don't just create charts for the sake of it.",
     },
 ];
 
@@ -99,7 +99,7 @@ const CONCEPTS = [
         definition:
             'Values that are unusually high or low compared to the rest of the data.',
         example:
-            'A person\'s age listed as 200 in a dataset where most ages are 20-60.',
+            "A person's age listed as 200 in a dataset where most ages are 20-60.",
         color: 'text-[#3C6E71]',
     },
     {
@@ -112,8 +112,7 @@ const CONCEPTS = [
     },
     {
         term: 'Standardization',
-        definition:
-            'Making all values in a column follow the same format.',
+        definition: 'Making all values in a column follow the same format.',
         example:
             'Converting "Male," "male," "MALE" all to "Male" so they group together.',
         color: 'text-[#2E7D32]',
@@ -133,8 +132,8 @@ export default function WorkflowGuide({ currentStep }: Props) {
                     </CardTitle>
                 </div>
                 <CardDescription>
-                    What you&apos;re doing, why it matters, and what
-                    you&apos;re learning.
+                    What you&apos;re doing, why it matters, and what you&apos;re
+                    learning.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

@@ -159,13 +159,14 @@ export default function ProfilePanel({ profile }: Props) {
                                                     of{' '}
                                                     {col.missing_count +
                                                         col.unique_count}{' '}
-                                                    rows ({col.missing_percentage}
+                                                    rows (
+                                                    {col.missing_percentage}
                                                     %)
                                                 </p>
                                             </TooltipContent>
                                         </Tooltip>
                                         <span
-                                            className={`w-12 text-right text-xs tabular-nums font-medium ${
+                                            className={`w-12 text-right text-xs font-medium tabular-nums ${
                                                 pct > 0
                                                     ? 'text-[#F59E0B]'
                                                     : 'text-[#2E7D32]'
@@ -184,8 +185,8 @@ export default function ProfilePanel({ profile }: Props) {
                     columnsWithOutliers.length === 0 &&
                     profile.duplicate_count === 0 && (
                         <div className="rounded-lg bg-[#E8F5E9] p-3 text-sm text-[#2E7D32]">
-                            Your data looks clean! No missing values, duplicates,
-                            or outliers detected.
+                            Your data looks clean! No missing values,
+                            duplicates, or outliers detected.
                         </div>
                     )}
 
@@ -195,18 +196,12 @@ export default function ProfilePanel({ profile }: Props) {
                             <tr>
                                 <th className="px-3 py-2 text-left">Column</th>
                                 <th className="px-3 py-2 text-left">Type</th>
-                                <th className="px-3 py-2 text-left">
-                                    Missing
-                                </th>
-                                <th className="px-3 py-2 text-left">
-                                    Unique
-                                </th>
+                                <th className="px-3 py-2 text-left">Missing</th>
+                                <th className="px-3 py-2 text-left">Unique</th>
                                 <th className="px-3 py-2 text-left">Min</th>
                                 <th className="px-3 py-2 text-left">Max</th>
                                 <th className="px-3 py-2 text-left">Avg</th>
-                                <th className="px-3 py-2 text-left">
-                                    Median
-                                </th>
+                                <th className="px-3 py-2 text-left">Median</th>
                                 <th className="px-3 py-2 text-left">
                                     Most Frequent
                                 </th>

@@ -9,13 +9,18 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { CleaningLogEntry } from '@/types/datasets';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import type { CleaningLogEntry, DatasetPageProps } from '@/types/datasets';
 
 interface Props {
     datasetId: number;
     cleaningLog: CleaningLogEntry[];
     snapshotCount: number;
+    onDatasetUpdated: (dataset: DatasetPageProps) => void;
 }
 
 const operationLabels: Record<string, string> = {
@@ -24,12 +29,25 @@ const operationLabels: Record<string, string> = {
     convert_type: 'Converted data type',
     standardize_text: 'Standardized text',
     filter_invalid: 'Filtered invalid rows',
+    replace_values: 'Replaced values',
+    remove_pattern: 'Removed pattern',
+    extract_number: 'Extracted numbers',
+    split_column: 'Split column',
+    parse_list: 'Parsed list values',
+    rename_column: 'Renamed column',
+    remove_column: 'Removed column',
+    merge_columns: 'Merged columns',
+    numeric_range_filter: 'Filtered numeric range',
+    date_format_convert: 'Converted date format',
+    remove_special_characters: 'Removed special characters',
+    ai_recommendation_pipeline: 'Applied AI recommendation',
 };
 
 export default function UndoToolbar({
     datasetId,
     cleaningLog,
     snapshotCount,
+    onDatasetUpdated,
 }: Props) {
     const [pendingUndoLast, setPendingUndoLast] = useState(false);
     const [pendingReset, setPendingReset] = useState(false);
@@ -38,29 +56,52 @@ export default function UndoToolbar({
 
     const handleUndoLast = () => {
         setPendingUndoLast(true);
-        router.post(`/datasets/${datasetId}/undo`, {}, {
-            onFinish: () => setPendingUndoLast(false),
-        });
+        router.post(
+            `/datasets/${datasetId}/undo`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    onDatasetUpdated(page.props.dataset as DatasetPageProps);
+                    setPendingUndoLast(false);
+                },
+                onFinish: () => setPendingUndoLast(false),
+            },
+        );
     };
 
     const handleUndoTo = (index: number) => {
         router.post(
             `/datasets/${datasetId}/undo/${index}`,
             {},
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    onDatasetUpdated(page.props.dataset as DatasetPageProps);
+                },
+            },
         );
     };
 
     const handleReset = () => {
         setPendingReset(true);
-        router.post(`/datasets/${datasetId}/reset`, {}, {
-            onFinish: () => setPendingReset(false),
-        });
+        router.post(
+            `/datasets/${datasetId}/reset`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    onDatasetUpdated(page.props.dataset as DatasetPageProps);
+                    setPendingReset(false);
+                },
+                onFinish: () => setPendingReset(false),
+            },
+        );
     };
 
     const latestOperationLabel = hasOperations
-        ? operationLabels[cleaningLog[cleaningLog.length - 1].operation] ??
-            cleaningLog[cleaningLog.length - 1].operation
+        ? (operationLabels[cleaningLog[cleaningLog.length - 1].operation] ??
+          cleaningLog[cleaningLog.length - 1].operation)
         : '';
 
     const formatDate = (isoString: string): string =>
@@ -97,9 +138,7 @@ export default function UndoToolbar({
                                 }
                             }}
                         >
-                            {pendingUndoLast
-                                ? 'Undoing...'
-                                : 'Undo Last'}
+                            {pendingUndoLast ? 'Undoing...' : 'Undo Last'}
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -125,45 +164,45 @@ export default function UndoToolbar({
                         </div>
                         <DropdownMenuSeparator />
 
-                        {cleaningLog
-                            .map((entry, logIndex) => {
-                                const snapshotIndex =
-                                    cleaningLog.length - 1 - logIndex;
-                                const label =
-                                    operationLabels[entry.operation] ??
-                                    entry.operation;
-                                const date = formatDate(entry.applied_at);
+                        {cleaningLog.map((entry, logIndex) => {
+                            const snapshotIndex =
+                                cleaningLog.length - 1 - logIndex;
+                            const label =
+                                operationLabels[entry.operation] ??
+                                entry.operation;
+                            const date = formatDate(entry.applied_at);
 
-                                return (
-                                    <DropdownMenuItem
-                                        key={`${entry.operation}-${entry.applied_at}`}
-                                        onClick={() => {
-                                            if (
-                                                window.confirm(
-                                                    `Revert to state before "${label}"? Operations after this point will be undone.`,
-                                                )
-                                            ) {
-                                                handleUndoTo(
-                                                    cleaningLog.length - 1 -
-                                                        logIndex,
-                                                );
-                                            }
-                                        }}
-                                    >
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="text-sm font-medium">
-                                                Before: {label}
-                                            </span>
-                                            <span className="text-xs text-muted-foreground">
-                                                {date}
-                                                {snapshotIndex === 0
-                                                    ? ' (undo last action)'
-                                                    : ` (undo ${snapshotIndex + 1} actions)`}
-                                            </span>
-                                        </div>
-                                    </DropdownMenuItem>
-                                );
-                            })}
+                            return (
+                                <DropdownMenuItem
+                                    key={`${entry.operation}-${entry.applied_at}`}
+                                    onClick={() => {
+                                        if (
+                                            window.confirm(
+                                                `Revert to state before "${label}"? Operations after this point will be undone.`,
+                                            )
+                                        ) {
+                                            handleUndoTo(
+                                                cleaningLog.length -
+                                                    1 -
+                                                    logIndex,
+                                            );
+                                        }
+                                    }}
+                                >
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-sm font-medium">
+                                            Before: {label}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {date}
+                                            {snapshotIndex === 0
+                                                ? ' (undo last action)'
+                                                : ` (undo ${snapshotIndex + 1} actions)`}
+                                        </span>
+                                    </div>
+                                </DropdownMenuItem>
+                            );
+                        })}
 
                         <DropdownMenuSeparator />
                         <DropdownMenuItem

@@ -14,6 +14,7 @@ import type { CleaningLogEntry, DatasetPageProps } from '@/types/datasets';
 
 interface Props {
     dataset: DatasetPageProps;
+    onDatasetUpdated: (dataset: DatasetPageProps) => void;
 }
 
 interface Recipe {
@@ -46,7 +47,7 @@ function stepLabel(step: Record<string, unknown>): string {
     return `${label}${col}`;
 }
 
-export default function RecipePanel({ dataset }: Props) {
+export default function RecipePanel({ dataset, onDatasetUpdated }: Props) {
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [loadingRecipes, setLoadingRecipes] = useState(false);
     const hasFetched = useRef(false);
@@ -111,21 +112,18 @@ export default function RecipePanel({ dataset }: Props) {
             },
         );
 
-        const response = await fetch(
-            `/datasets/${dataset.id}/recipes`,
-            {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken(),
-                },
-                body: JSON.stringify({
-                    name: recipeName.trim(),
-                    steps,
-                }),
+        const response = await fetch(`/datasets/${dataset.id}/recipes`, {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
             },
-        );
+            body: JSON.stringify({
+                name: recipeName.trim(),
+                steps,
+            }),
+        });
 
         setSaving(false);
 
@@ -147,7 +145,7 @@ export default function RecipePanel({ dataset }: Props) {
             {
                 method: 'POST',
                 headers: {
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': csrfToken(),
                 },
@@ -160,7 +158,10 @@ export default function RecipePanel({ dataset }: Props) {
             setMessage('Recipe applied! Refreshing...');
             router.reload({
                 only: ['dataset'],
-                onSuccess: () => setMessage(null),
+                onSuccess: (page) => {
+                    onDatasetUpdated(page.props.dataset as DatasetPageProps);
+                    setMessage(null);
+                },
             });
         } else {
             setMessage('Failed to apply recipe.');
@@ -171,7 +172,7 @@ export default function RecipePanel({ dataset }: Props) {
         await fetch(`/recipes/${recipeId}`, {
             method: 'DELETE',
             headers: {
-                'Accept': 'application/json',
+                Accept: 'application/json',
                 'X-CSRF-TOKEN': csrfToken(),
             },
         });
@@ -195,8 +196,8 @@ export default function RecipePanel({ dataset }: Props) {
                 {hasCleaningLog && (
                     <div className="rounded-lg bg-[#E7F0F5] p-4">
                         <p className="mb-2 text-sm font-semibold text-[#284B63]">
-                            Current cleaning steps (
-                            {dataset.cleaningLog.length})
+                            Current cleaning steps ({dataset.cleaningLog.length}
+                            )
                         </p>
                         <ol className="list-decimal space-y-1 pl-4 text-sm text-[#353535]">
                             {(dataset.cleaningLog ?? []).map(
@@ -223,7 +224,9 @@ export default function RecipePanel({ dataset }: Props) {
                             type="button"
                             variant="secondary"
                             onClick={saveRecipe}
-                            disabled={!recipeName.trim() || saving || !hasCleaningLog}
+                            disabled={
+                                !recipeName.trim() || saving || !hasCleaningLog
+                            }
                         >
                             {saving ? (
                                 <Loader2 className="size-4 animate-spin" />
@@ -271,7 +274,7 @@ export default function RecipePanel({ dataset }: Props) {
                                     className="flex items-start justify-between gap-3 rounded-lg border p-3"
                                 >
                                     <div className="min-w-0 flex-1">
-                                        <p className="font-medium text-sm text-[#353535]">
+                                        <p className="text-sm font-medium text-[#353535]">
                                             {recipe.name}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
@@ -295,12 +298,8 @@ export default function RecipePanel({ dataset }: Props) {
                                             type="button"
                                             size="sm"
                                             variant="secondary"
-                                            onClick={() =>
-                                                applyRecipe(recipe)
-                                            }
-                                            disabled={
-                                                applying === recipe.id
-                                            }
+                                            onClick={() => applyRecipe(recipe)}
+                                            disabled={applying === recipe.id}
                                         >
                                             {applying === recipe.id ? (
                                                 <Loader2 className="size-3.5 animate-spin" />

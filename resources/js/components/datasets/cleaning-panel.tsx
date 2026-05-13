@@ -1,11 +1,5 @@
 import { router } from '@inertiajs/react';
-import {
-    CheckCircle2,
-    Eye,
-    HelpCircle,
-    Lightbulb,
-    Wand2,
-} from 'lucide-react';
+import { CheckCircle2, Eye, HelpCircle, Lightbulb, Wand2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,7 +29,14 @@ type CleaningOperation =
     | 'fill_missing'
     | 'convert_type'
     | 'standardize_text'
-    | 'filter_invalid';
+    | 'filter_invalid'
+    | 'replace_values'
+    | 'remove_pattern'
+    | 'extract_number'
+    | 'split_column'
+    | 'parse_list'
+    | 'rename_column'
+    | 'remove_column';
 
 interface CleaningConfig {
     operation: CleaningOperation;
@@ -44,10 +45,18 @@ interface CleaningConfig {
     value: string;
     target_type: string;
     text_format: string;
+    search_value: string;
+    replacement_value: string;
+    pattern: string;
+    delimiter: string;
+    output_delimiter: string;
+    new_columns: string;
+    new_column: string;
 }
 
 interface Props {
     dataset: DatasetPageProps;
+    onDatasetUpdated: (dataset: DatasetPageProps) => void;
 }
 
 interface ActionDefinition {
@@ -94,9 +103,9 @@ const actionDefinitions: ActionDefinition[] = [
         description:
             'Convert values to numeric, text, date, or boolean format.',
         whyDoThis:
-            'Numbers stored as text can\'t be used in calculations. Dates stored as text won\'t sort properly. Correct types enable charts, stats, and analysis to work.',
+            "Numbers stored as text can't be used in calculations. Dates stored as text won't sort properly. Correct types enable charts, stats, and analysis to work.",
         whenToUse:
-            'When a column shows numbers left-aligned (stored as text) or dates that don\'t sort chronologically — common when importing from Excel or CSV exports.',
+            "When a column shows numbers left-aligned (stored as text) or dates that don't sort chronologically — common when importing from Excel or CSV exports.",
         example:
             'A "Price" column showing "$10.00" as text: convert to numeric (10.00) so you can calculate totals and averages.',
         studentTip:
@@ -128,6 +137,89 @@ const actionDefinitions: ActionDefinition[] = [
         studentTip:
             'Review filtered rows before removing them. Sometimes invalid data is actually correct data in an unexpected format (e.g., "N/A" might mean "Not Applicable," not missing).',
     },
+    {
+        operation: 'replace_values',
+        title: 'Replace Values',
+        description:
+            'Replace exact tokens such as N/A, Unknown, or typo variants.',
+        whyDoThis:
+            'Consistent values make categories group correctly and reduce fake unique values during analysis.',
+        whenToUse:
+            'When one value should be standardized to another value across a column.',
+        example: 'Replace "Unknown" with a blank or "Not specified".',
+        studentTip:
+            'Use this for clear, repeated tokens. Preview first to avoid replacing meaningful values.',
+    },
+    {
+        operation: 'remove_pattern',
+        title: 'Remove Pattern',
+        description:
+            'Remove regex patterns such as bracketed citation markers.',
+        whyDoThis:
+            'Imported web data often contains citations like [1] that block numeric conversion and clutter labels.',
+        whenToUse:
+            'When unwanted text follows a predictable pattern, such as [2], (est.), or ref markers.',
+        example: 'Pattern \\[^[\\]]*\\] removes values like [2].',
+        studentTip:
+            'For bracketed references, use \\[[^\\]]*\\]. Always preview regex changes.',
+    },
+    {
+        operation: 'extract_number',
+        title: 'Extract Number',
+        description: 'Keep the first numeric value from messy text.',
+        whyDoThis:
+            'Currency symbols, commas, and extra labels prevent calculations. Extracting numbers prepares columns for charts and statistics.',
+        whenToUse: 'When values look like "$780,000" or "about 42".',
+        example: '"$780,000,000" becomes "780000000".',
+        studentTip:
+            'After extracting numbers, convert the column to numeric for analysis.',
+    },
+    {
+        operation: 'split_column',
+        title: 'Split Column',
+        description: 'Split one text column into new columns by a delimiter.',
+        whyDoThis:
+            'Combined fields hide useful attributes. Splitting makes each attribute easier to profile and analyze.',
+        whenToUse: 'When cells contain values like "A - B" or "City, Country".',
+        example: 'Split "City, Country" into "City" and "Country".',
+        studentTip:
+            'Choose new column names that describe the split parts clearly.',
+    },
+    {
+        operation: 'parse_list',
+        title: 'Parse List Values',
+        description: 'Standardize multi-value cells such as A; B; C.',
+        whyDoThis:
+            'Consistent separators make list-like data easier to read, compare, and explain in a report.',
+        whenToUse:
+            'When cells contain several values separated by semicolons or pipes.',
+        example: '"A; B; C" becomes "A, B, C".',
+        studentTip:
+            'This does not create separate rows. It standardizes the list format in the same cell.',
+    },
+    {
+        operation: 'rename_column',
+        title: 'Rename Column',
+        description: 'Give a column a clearer analysis-ready name.',
+        whyDoThis:
+            'Clear labels make charts, tables, and defense explanations easier to understand.',
+        whenToUse:
+            'When uploaded headers are abbreviated, unclear, or inconsistent.',
+        example: 'Rename "Amt" to "Amount".',
+        studentTip: 'Use short, descriptive names without duplicate headers.',
+    },
+    {
+        operation: 'remove_column',
+        title: 'Remove Column',
+        description: 'Remove a column from the cleaned working copy.',
+        whyDoThis:
+            'Irrelevant columns can distract from the analysis and clutter visualizations.',
+        whenToUse:
+            'Only when a column is not needed for profiling, analysis, or reporting.',
+        example: 'Remove an empty notes column.',
+        studentTip:
+            'This is destructive for the working copy. Preview and make sure the original upload is preserved.',
+    },
 ];
 
 function csrfToken(): string {
@@ -137,7 +229,7 @@ function csrfToken(): string {
     );
 }
 
-export default function CleaningPanel({ dataset }: Props) {
+export default function CleaningPanel({ dataset, onDatasetUpdated }: Props) {
     const [config, setConfig] = useState<CleaningConfig>({
         operation: 'remove_duplicates',
         column: dataset.headers[0] ?? '',
@@ -145,6 +237,13 @@ export default function CleaningPanel({ dataset }: Props) {
         value: '',
         target_type: 'numeric',
         text_format: 'trim',
+        search_value: '',
+        replacement_value: '',
+        pattern: '\\[[^\\]]*\\]',
+        delimiter: ';',
+        output_delimiter: ', ',
+        new_columns: '',
+        new_column: '',
     });
     const [preview, setPreview] = useState<CleaningPreview | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -192,7 +291,12 @@ export default function CleaningPanel({ dataset }: Props) {
         router.post(
             `/datasets/${dataset.id}/clean`,
             { ...config },
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    onDatasetUpdated(page.props.dataset as DatasetPageProps);
+                },
+            },
         );
     }
 
@@ -211,12 +315,11 @@ export default function CleaningPanel({ dataset }: Props) {
             </CardHeader>
 
             <CardContent className="space-y-5">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     {actionDefinitions.map((action) => {
                         const isSelected =
                             action.operation === config.operation;
-                        const isExpanded =
-                            action.operation === expandedAction;
+                        const isExpanded = action.operation === expandedAction;
 
                         return (
                             <button
@@ -460,6 +563,129 @@ export default function CleaningPanel({ dataset }: Props) {
                             </Select>
                         </div>
                     )}
+
+                    {config.operation === 'replace_values' && (
+                        <>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">
+                                    Find value
+                                </label>
+                                <Input
+                                    value={config.search_value}
+                                    onChange={(event) =>
+                                        updateConfig(
+                                            'search_value',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="Unknown"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">
+                                    Replace with
+                                </label>
+                                <Input
+                                    value={config.replacement_value}
+                                    onChange={(event) =>
+                                        updateConfig(
+                                            'replacement_value',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="Not specified"
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    {config.operation === 'remove_pattern' && (
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">
+                                Pattern to remove
+                            </label>
+                            <Input
+                                value={config.pattern}
+                                onChange={(event) =>
+                                    updateConfig('pattern', event.target.value)
+                                }
+                                placeholder="\\[[^\\]]*\\]"
+                            />
+                        </div>
+                    )}
+
+                    {(config.operation === 'split_column' ||
+                        config.operation === 'parse_list') && (
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">
+                                Delimiter
+                            </label>
+                            <Input
+                                value={config.delimiter}
+                                onChange={(event) =>
+                                    updateConfig(
+                                        'delimiter',
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder=";"
+                            />
+                        </div>
+                    )}
+
+                    {config.operation === 'parse_list' && (
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">
+                                Output separator
+                            </label>
+                            <Input
+                                value={config.output_delimiter}
+                                onChange={(event) =>
+                                    updateConfig(
+                                        'output_delimiter',
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder=", "
+                            />
+                        </div>
+                    )}
+
+                    {config.operation === 'split_column' && (
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">
+                                New columns
+                            </label>
+                            <Input
+                                value={config.new_columns}
+                                onChange={(event) =>
+                                    updateConfig(
+                                        'new_columns',
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder="First part, Second part"
+                            />
+                        </div>
+                    )}
+
+                    {config.operation === 'rename_column' && (
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">
+                                New column name
+                            </label>
+                            <Input
+                                value={config.new_column}
+                                onChange={(event) =>
+                                    updateConfig(
+                                        'new_column',
+                                        event.target.value,
+                                    )
+                                }
+                                placeholder="Clear column name"
+                            />
+                        </div>
+                    )}
                 </div>
 
                 {error && (
@@ -571,8 +797,8 @@ export default function CleaningPanel({ dataset }: Props) {
                                     action.
                                 </p>
                                 <p className="mt-1 text-xs">
-                                    The data may already be in the desired state,
-                                    or the operation may not apply to the
+                                    The data may already be in the desired
+                                    state, or the operation may not apply to the
                                     selected column.
                                 </p>
                             </div>

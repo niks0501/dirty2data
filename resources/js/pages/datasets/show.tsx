@@ -10,6 +10,7 @@ import {
     Rows3,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import AiCleaningRecommendationsPanel from '@/components/datasets/ai-cleaning-recommendations-panel';
 import AttributePanel from '@/components/datasets/attribute-panel';
 import ChartPanel from '@/components/datasets/chart-panel';
 import CleaningAuditLog from '@/components/datasets/cleaning-audit-log';
@@ -317,12 +318,21 @@ export default function Show({ dataset, qualityScore }: Props) {
                             snapshotCount={
                                 currentDataset.cleaningSnapshots?.length ?? 0
                             }
+                            onDatasetUpdated={setCurrentDataset}
                         />
-                        <CleaningPanel dataset={currentDataset} />
-                        <CleaningAuditLog
-                            log={currentDataset.cleaningLog}
+                        <AiCleaningRecommendationsPanel
+                            dataset={currentDataset}
+                            onDatasetUpdated={setCurrentDataset}
                         />
-                        <RecipePanel dataset={currentDataset} />
+                        <CleaningPanel
+                            dataset={currentDataset}
+                            onDatasetUpdated={setCurrentDataset}
+                        />
+                        <CleaningAuditLog log={currentDataset.cleaningLog} />
+                        <RecipePanel
+                            dataset={currentDataset}
+                            onDatasetUpdated={setCurrentDataset}
+                        />
                         <ChartPanel dataset={currentDataset} />
                     </>
                 )}
