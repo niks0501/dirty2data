@@ -42,9 +42,10 @@ class CleaningRecommendationManager
                 $fallbackReason = 'Gemini returned no supported recommendations.';
             }
         } catch (\Throwable $e) {
-            $fallbackReason = $e->getMessage();
+            $fallbackReason = 'AI recommendation service is temporarily unavailable. Using local heuristics instead.';
             Log::warning('AI cleaning recommendations fell back to local heuristics.', [
-                'reason' => $fallbackReason,
+                'reason' => $e->getMessage(),
+                'exception_class' => get_class($e),
             ]);
         }
 
