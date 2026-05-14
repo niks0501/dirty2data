@@ -11,6 +11,7 @@ import type { DatasetQualityScore } from '@/types/datasets';
 
 interface Props {
     score: DatasetQualityScore;
+    label?: string;
 }
 
 const STATUS_STYLES: Record<
@@ -60,7 +61,7 @@ function getBarColor(value: number): string {
     return 'bg-[#C62828]';
 }
 
-export default function QualityScoreCard({ score }: Props) {
+export default function QualityScoreCard({ score, label }: Props) {
     const statusStyle = STATUS_STYLES[score.status] ?? STATUS_STYLES.Good;
     const StatusIcon = statusStyle.icon;
 
@@ -68,7 +69,7 @@ export default function QualityScoreCard({ score }: Props) {
         <Card>
             <CardHeader className="pb-3">
                 <CardTitle className="text-base font-semibold text-[#353535]">
-                    Data Quality Score
+                    {label ?? 'Data Quality Score'}
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Datasets\ChartDatasetRequest;
 use App\Http\Requests\Datasets\CleanDatasetRequest;
 use App\Http\Requests\Datasets\StoreDatasetRequest;
+use App\Jobs\ProcessAfterQualityScore;
 use App\Jobs\ProcessDatasetUpload;
 use App\Models\Dataset;
 use App\Models\DatasetCleaningRecommendation;
@@ -188,10 +189,12 @@ class DatasetController extends Controller
 
         $previewNote = $dataset->preview['preview_note'] ?? null;
 
-        $qualityScore = $dataset->latestBeforeQualityScore();
+        $beforeScore = $dataset->latestBeforeQualityScore();
+        $afterScore = $dataset->latestAfterQualityScore();
 
         return Inertia::render('datasets/show', [
-            'qualityScore' => $this->formatQualityScore($qualityScore),
+            'beforeScore' => $this->formatQualityScore($beforeScore),
+            'afterScore' => $this->formatQualityScore($afterScore),
             'dataset' => [
                 'id' => $dataset->id,
                 'originalName' => $dataset->original_name,
@@ -268,6 +271,8 @@ class DatasetController extends Controller
             'cleaning_log' => $log,
             'cleaning_snapshots' => $snapshots,
         ]);
+
+        ProcessAfterQualityScore::dispatch($dataset, $profile)->afterResponse();
 
         return to_route('datasets.show', ['dataset' => $dataset])->with('toast', [
             'type' => 'success',
@@ -407,6 +412,7 @@ class DatasetController extends Controller
         }
 
         return [
+            'score_type' => $score->score_type,
             'quality_score' => $score->quality_score,
             'status' => $score->status,
             'breakdown' => [

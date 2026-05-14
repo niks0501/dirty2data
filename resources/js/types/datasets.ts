@@ -221,6 +221,7 @@ export interface QualityRecommendation {
 
 /** Deterministic data quality score returned after profiling. */
 export interface DatasetQualityScore {
+    score_type: 'before' | 'after';
     quality_score: number;
     status: string;
     breakdown: QualityBreakdownScore;

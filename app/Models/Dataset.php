@@ -83,6 +83,17 @@ class Dataset extends Model
     }
 
     /**
+     * Get the latest 'after' quality score (post-cleaning result).
+     */
+    public function latestAfterQualityScore(): ?DatasetQualityScore
+    {
+        return $this->qualityScores()
+            ->where('score_type', 'after')
+            ->latest()
+            ->first();
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

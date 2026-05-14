@@ -30,7 +30,8 @@ import type { DatasetPageProps, DatasetQualityScore } from '@/types/datasets';
 
 interface Props {
     dataset: DatasetPageProps;
-    qualityScore: DatasetQualityScore | null;
+    beforeScore: DatasetQualityScore | null;
+    afterScore: DatasetQualityScore | null;
 }
 
 function formatBytes(bytes: number): string {
@@ -67,8 +68,10 @@ function formatDateTime(isoString: string | null): string {
     });
 }
 
-export default function Show({ dataset, qualityScore }: Props) {
+export default function Show({ dataset, beforeScore, afterScore }: Props) {
     const [currentDataset, setCurrentDataset] = useState(dataset);
+    const [currentBeforeScore, setCurrentBeforeScore] = useState(beforeScore);
+    const [currentAfterScore, setCurrentAfterScore] = useState(afterScore);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const isProcessing = currentDataset.status === 'processing';
@@ -103,11 +106,13 @@ export default function Show({ dataset, qualityScore }: Props) {
 
         pollingRef.current = setInterval(() => {
             router.reload({
-                only: ['dataset', 'qualityScore'],
+                only: ['dataset', 'beforeScore', 'afterScore'],
                 onSuccess: (page) => {
                     const updated = page.props.dataset as DatasetPageProps;
 
                     setCurrentDataset(updated);
+                    setCurrentBeforeScore((page.props.beforeScore as DatasetQualityScore | null) ?? null);
+                    setCurrentAfterScore((page.props.afterScore as DatasetQualityScore | null) ?? null);
 
                     if (updated.status !== 'processing') {
                         if (pollingRef.current) {
@@ -295,8 +300,12 @@ export default function Show({ dataset, qualityScore }: Props) {
                             </div>
                         )}
 
-                        {qualityScore && (
-                            <QualityScoreCard score={qualityScore} />
+                        {currentBeforeScore && (
+                            <QualityScoreCard score={currentBeforeScore} label="Before Cleaning" />
+                        )}
+
+                        {currentAfterScore && (
+                            <QualityScoreCard score={currentAfterScore} label="After Cleaning" />
                         )}
 
                         <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">

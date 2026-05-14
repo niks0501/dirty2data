@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Datasets;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessAfterQualityScore;
 use App\Models\Dataset;
 use App\Services\Datasets\DatasetProfiler;
 use Illuminate\Http\RedirectResponse;
@@ -46,6 +47,8 @@ class DatasetUndoController extends Controller
             'cleaning_log' => $log,
             'profile' => $profile,
         ]);
+
+        ProcessAfterQualityScore::dispatch($dataset, $profile)->afterResponse();
 
         return to_route('datasets.show', ['dataset' => $dataset])->with('toast', [
             'type' => 'success',
@@ -92,6 +95,8 @@ class DatasetUndoController extends Controller
             'profile' => $profile,
         ]);
 
+        ProcessAfterQualityScore::dispatch($dataset, $profile)->afterResponse();
+
         return to_route('datasets.show', ['dataset' => $dataset])->with('toast', [
             'type' => 'success',
             'message' => __('Dataset has been restored to the selected point.'),
@@ -118,6 +123,8 @@ class DatasetUndoController extends Controller
             'cleaning_log' => [],
             'profile' => $profile,
         ]);
+
+        ProcessAfterQualityScore::dispatch($dataset, $profile)->afterResponse();
 
         return to_route('datasets.show', ['dataset' => $dataset])->with('toast', [
             'type' => 'success',

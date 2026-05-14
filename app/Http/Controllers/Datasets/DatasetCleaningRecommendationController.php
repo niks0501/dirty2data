@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Datasets;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessAfterQualityScore;
 use App\Models\Dataset;
 use App\Models\DatasetCleaningRecommendation;
 use App\Services\AI\CleaningRecommendationManager;
@@ -170,6 +171,8 @@ class DatasetCleaningRecommendationController extends Controller
             'cleaning_log' => $log,
             'cleaning_snapshots' => $snapshots,
         ]);
+
+        ProcessAfterQualityScore::dispatch($dataset, $profile)->afterResponse();
 
         $recommendation->update(['status' => 'applied']);
 
