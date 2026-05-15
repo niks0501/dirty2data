@@ -15,6 +15,8 @@ use App\Services\Datasets\DatasetChartBuilder;
 use App\Services\Datasets\DatasetChartRecommender;
 use App\Services\Datasets\DatasetCleaner;
 use App\Services\Datasets\DatasetCleaningPreviewer;
+use App\Services\Datasets\DatasetComparisonBuilder;
+use App\Services\Datasets\DatasetInsightsBuilder;
 use App\Services\Datasets\DatasetPreviewParser;
 use App\Services\Datasets\DatasetProfiler;
 use App\Services\Datasets\DatasetQualityScoreClient;
@@ -316,6 +318,27 @@ class DatasetController extends Controller
                 $this->chartOptions($request),
             ),
         ]);
+    }
+
+    public function comparison(Request $request, Dataset $dataset, DatasetComparisonBuilder $comparisonBuilder): JsonResponse
+    {
+        $this->authorizeDataset($request, $dataset);
+
+        $page = max((int) $request->integer('page', 1), 1);
+        $perPage = min(max((int) $request->integer('per_page', 15), 1), 100);
+
+        return response()->json(
+            $comparisonBuilder->build($dataset, $page, $perPage)
+        );
+    }
+
+    public function insights(Request $request, Dataset $dataset, DatasetInsightsBuilder $insightsBuilder): JsonResponse
+    {
+        $this->authorizeDataset($request, $dataset);
+
+        return response()->json(
+            $insightsBuilder->build($dataset)
+        );
     }
 
     /**

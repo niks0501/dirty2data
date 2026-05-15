@@ -229,3 +229,56 @@ export interface DatasetQualityScore {
     issues: QualityIssue[];
     recommendations: QualityRecommendation[];
 }
+
+/** A single cell in a comparison row, tracking its current value and whether it changed from the original. */
+export interface ComparisonCell {
+    header: string;
+    value: DatasetValue;
+    changed: boolean;
+}
+
+/** A row in a comparison between original and cleaned datasets. */
+export interface ComparisonRow {
+    rowNumber: number;
+    status: 'unchanged' | 'modified' | 'added' | 'removed';
+    cells: Array<Record<string, ComparisonCell>>;
+}
+
+/** Summary statistics for a dataset comparison. */
+export interface ComparisonSummary {
+    totalRows: number;
+    rowsModified: number;
+    rowsUnchanged: number;
+    cellsChanged: number;
+    duplicatesRemoved: number;
+    missingValuesFilled: number;
+    rowsRemoved: number;
+}
+
+/** Complete comparison payload including rows, summary, and pagination. */
+export interface ComparisonPayload {
+    rows: ComparisonRow[];
+    summary: ComparisonSummary;
+    pagination: DatasetPagination;
+}
+
+/** Category classification for a dataset insight. */
+export type InsightCategory = 'trend' | 'distribution' | 'outlier' | 'correlation' | 'segment' | 'quality' | 'general';
+
+/** A single plain-language insight derived from dataset analysis. */
+export interface DatasetInsight {
+    id: string;
+    category: InsightCategory;
+    title: string;
+    description: string;
+    severity: 'info' | 'warning' | 'positive' | 'neutral';
+    related_column: string | null;
+    metadata: Record<string, DatasetValue> | null;
+}
+
+/** Payload containing a collection of dataset insights with generation metadata. */
+export interface DatasetInsightsPayload {
+    insights: DatasetInsight[];
+    generated_at: string;
+    summary: string;
+}

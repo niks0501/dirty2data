@@ -27,6 +27,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('datasets/{dataset}/cleaning/recommendations/{recommendation}/apply', [DatasetCleaningRecommendationController::class, 'apply'])->name('datasets.cleaning.recommendations.apply');
     Route::post('datasets/{dataset}/cleaning/recommendations/{recommendation}/reject', [DatasetCleaningRecommendationController::class, 'reject'])->name('datasets.cleaning.recommendations.reject');
     Route::get('datasets/{dataset}/chart', [DatasetController::class, 'chart'])->name('datasets.chart');
+    Route::get('datasets/{dataset}/comparison', [DatasetController::class, 'comparison'])->name('datasets.comparison');
+    Route::get('datasets/{dataset}/insights', [DatasetController::class, 'insights'])->name('datasets.insights');
 
     Route::post('datasets/{dataset}/undo', [DatasetUndoController::class, 'undoLast'])->name('datasets.undo');
     Route::post('datasets/{dataset}/undo/{index}', [DatasetUndoController::class, 'undoTo'])->whereNumber('index')->name('datasets.undoTo');

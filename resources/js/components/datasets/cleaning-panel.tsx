@@ -36,7 +36,11 @@ type CleaningOperation =
     | 'split_column'
     | 'parse_list'
     | 'rename_column'
-    | 'remove_column';
+    | 'remove_column'
+    | 'merge_columns'
+    | 'numeric_range_filter'
+    | 'date_format_convert'
+    | 'remove_special_characters';
 
 interface CleaningConfig {
     operation: CleaningOperation;
@@ -52,6 +56,11 @@ interface CleaningConfig {
     output_delimiter: string;
     new_columns: string;
     new_column: string;
+    second_column: string;
+    separator: string;
+    min: string;
+    max: string;
+    date_format: string;
 }
 
 interface Props {
@@ -220,6 +229,60 @@ const actionDefinitions: ActionDefinition[] = [
         studentTip:
             'This is destructive for the working copy. Preview and make sure the original upload is preserved.',
     },
+    {
+        operation: 'merge_columns',
+        title: 'Merge Columns',
+        description: 'Combine two columns into one with a separator.',
+        whyDoThis:
+            "Splitting related information across columns makes analysis harder. Merging creates a cleaner, more readable field for labels, names, or combined identifiers.",
+        whenToUse:
+            "When two columns contain parts of the same information (e.g., 'First Name' and 'Last Name', or 'City' and 'Country').",
+        example:
+            "Merge 'First Name' and 'Last Name' with a space separator to create 'Full Name'.",
+        studentTip:
+            'Choose a separator that makes sense (space for names, comma for locations). The original columns stay in the dataset.',
+    },
+    {
+        operation: 'numeric_range_filter',
+        title: 'Filter Numeric Range',
+        description:
+            'Keep only rows where a numeric column falls within a range.',
+        whyDoThis:
+            'Extreme values (outliers) can distort averages and charts. Filtering to a sensible range keeps your analysis focused on relevant data.',
+        whenToUse:
+            'When a numeric column has unreasonable values (e.g., negative ages, prices far above normal, or values outside expected bounds).',
+        example: "Filter 'Age' to keep only values between 0 and 120.",
+        studentTip:
+            'Set either a minimum, a maximum, or both. Check the column profile first to see the current min and max before deciding your range.',
+    },
+    {
+        operation: 'date_format_convert',
+        title: 'Convert Date Format',
+        description:
+            'Standardize dates to a consistent format like YYYY-MM-DD.',
+        whyDoThis:
+            "Inconsistent date formats ('01/15/2024' vs '2024-01-15' vs 'Jan 15, 2024') prevent proper sorting and time-based analysis.",
+        whenToUse:
+            'When dates in a column use different formats, making them sort incorrectly or appear as text.',
+        example:
+            "Convert all dates to 'Y-m-d' format for consistent sorting and chart-friendly values.",
+        studentTip:
+            "PHP's strtotime() handles most common date formats automatically. Choose a target format that works well with charts and sorting.",
+    },
+    {
+        operation: 'remove_special_characters',
+        title: 'Remove Special Characters',
+        description:
+            'Strip symbols and non-standard characters from text columns.',
+        whyDoThis:
+            'Special characters (®, ™, ★, emoji, currency symbols) clutter text data and can break text-based analysis, grouping, and export.',
+        whenToUse:
+            "When text columns contain unexpected symbols, emoji, or special punctuation that isn't meaningful for analysis.",
+        example:
+            "Strip '★' and '™' from product names to keep only letters, numbers, spaces, and basic punctuation.",
+        studentTip:
+            "This keeps letters, numbers, spaces, periods, commas, hyphens, and underscores. Everything else is removed. Preview first to make sure important symbols aren't lost.",
+    },
 ];
 
 function csrfToken(): string {
@@ -244,6 +307,11 @@ export default function CleaningPanel({ dataset, onDatasetUpdated }: Props) {
         output_delimiter: ', ',
         new_columns: '',
         new_column: '',
+        second_column: '',
+        separator: ' ',
+        min: '',
+        max: '',
+        date_format: 'Y-m-d',
     });
     const [preview, setPreview] = useState<CleaningPreview | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -686,6 +754,140 @@ export default function CleaningPanel({ dataset, onDatasetUpdated }: Props) {
                             />
                         </div>
                     )}
+
+                    {config.operation === 'merge_columns' && (
+                        <>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">
+                                    Second column
+                                </label>
+                                <Select
+                                    value={config.second_column}
+                                    onValueChange={(value) =>
+                                        updateConfig('second_column', value)
+                                    }
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select second column" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {dataset.headers.map((header) => (
+                                            <SelectItem
+                                                key={header}
+                                                value={header}
+                                            >
+                                                {header}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">
+                                    Separator
+                                </label>
+                                <Input
+                                    value={config.separator}
+                                    onChange={(event) =>
+                                        updateConfig(
+                                            'separator',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder=" "
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">
+                                    New column name
+                                </label>
+                                <Input
+                                    value={config.new_column}
+                                    onChange={(event) =>
+                                        updateConfig(
+                                            'new_column',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="Merged column name"
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    {config.operation === 'numeric_range_filter' && (
+                        <>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">
+                                    Min value
+                                </label>
+                                <Input
+                                    type="number"
+                                    value={config.min}
+                                    onChange={(event) =>
+                                        updateConfig(
+                                            'min',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="0"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">
+                                    Max value
+                                </label>
+                                <Input
+                                    type="number"
+                                    value={config.max}
+                                    onChange={(event) =>
+                                        updateConfig(
+                                            'max',
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="100"
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    {config.operation === 'date_format_convert' && (
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">
+                                Target date format
+                            </label>
+                            <Select
+                                value={config.date_format}
+                                onValueChange={(value) =>
+                                    updateConfig('date_format', value)
+                                }
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Y-m-d" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Y-m-d">
+                                        YYYY-MM-DD
+                                    </SelectItem>
+                                    <SelectItem value="m/d/Y">
+                                        MM/DD/YYYY
+                                    </SelectItem>
+                                    <SelectItem value="d-m-Y">
+                                        DD-MM-YYYY
+                                    </SelectItem>
+                                    <SelectItem value="F j, Y">
+                                        Month Day, Year
+                                    </SelectItem>
+                                    <SelectItem value="M j, Y">
+                                        Mon Day, Year
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+
+                    {/* remove_special_characters: no additional params needed — uses the column selector above */}
                 </div>
 
                 {error && (

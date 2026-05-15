@@ -15,7 +15,9 @@ import AttributePanel from '@/components/datasets/attribute-panel';
 import ChartPanel from '@/components/datasets/chart-panel';
 import CleaningAuditLog from '@/components/datasets/cleaning-audit-log';
 import CleaningPanel from '@/components/datasets/cleaning-panel';
+import ComparisonPanel from '@/components/datasets/comparison-panel';
 import DatasetPreviewTable from '@/components/datasets/dataset-preview-table';
+import InsightsPanel from '@/components/datasets/insights-panel';
 import ProfilePanel from '@/components/datasets/profile-panel';
 import QualityScoreCard from '@/components/datasets/quality-score-card';
 import RecipePanel from '@/components/datasets/recipe-panel';
@@ -72,7 +74,13 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
     const [currentDataset, setCurrentDataset] = useState(dataset);
     const [currentBeforeScore, setCurrentBeforeScore] = useState(beforeScore);
     const [currentAfterScore, setCurrentAfterScore] = useState(afterScore);
+    const [comparisonVersion, setComparisonVersion] = useState(0);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    const handleDatasetUpdated = (updated: DatasetPageProps) => {
+        setCurrentDataset(updated);
+        setComparisonVersion((v) => v + 1);
+    };
 
     const isProcessing = currentDataset.status === 'processing';
     const isFailed = currentDataset.status === 'failed';
@@ -321,21 +329,25 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
 
                         <DatasetPreviewTable dataset={currentDataset} />
                         <ProfilePanel profile={currentDataset.profile} />
+                        <ComparisonPanel
+                            datasetId={currentDataset.id}
+                            version={comparisonVersion}
+                        />
                         <UndoToolbar
                             datasetId={currentDataset.id}
                             cleaningLog={currentDataset.cleaningLog}
                             snapshotCount={
                                 currentDataset.cleaningSnapshots?.length ?? 0
                             }
-                            onDatasetUpdated={setCurrentDataset}
+                            onDatasetUpdated={handleDatasetUpdated}
                         />
                         <AiCleaningRecommendationsPanel
                             dataset={currentDataset}
-                            onDatasetUpdated={setCurrentDataset}
+                            onDatasetUpdated={handleDatasetUpdated}
                         />
                         <CleaningPanel
                             dataset={currentDataset}
-                            onDatasetUpdated={setCurrentDataset}
+                            onDatasetUpdated={handleDatasetUpdated}
                         />
                         <CleaningAuditLog log={currentDataset.cleaningLog} />
                         <RecipePanel
@@ -343,6 +355,7 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
                             onDatasetUpdated={setCurrentDataset}
                         />
                         <ChartPanel dataset={currentDataset} />
+                        <InsightsPanel datasetId={currentDataset.id} />
                     </>
                 )}
             </div>

@@ -1,4 +1,5 @@
-import { expect, test, type Cookie } from '@playwright/test';
+import { expect, test  } from '@playwright/test';
+import type {Cookie} from '@playwright/test';
 
 // ---------------------------------------------------------------------------
 // Test data
