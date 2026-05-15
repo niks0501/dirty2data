@@ -43,7 +43,26 @@ class DatasetTypeDetector
             return false;
         }
 
-        return in_array(mb_strtolower(trim($value)), ['', 'n/a', 'na', 'null', 'none', 'missing', 'unknown', '-', '--', '[]'], true);
+        $normalized = $this->normalizeBlankToken($value);
+
+        if ($normalized === '' || preg_match('/^-+$/', $normalized) === 1) {
+            return true;
+        }
+
+        return in_array($normalized, [
+            'n/a',
+            '#n/a',
+            'na',
+            'null',
+            'nil',
+            'none',
+            'missing',
+            'unknown',
+            'blank',
+            'notavailable',
+            'notapplicable',
+            '[]',
+        ], true);
     }
 
     public function isBooleanLike(mixed $value): bool
@@ -52,7 +71,11 @@ class DatasetTypeDetector
             return true;
         }
 
-        return is_string($value) && in_array(mb_strtolower(trim($value)), ['true', 'false', 'yes', 'no', '1', '0'], true);
+        if (is_int($value) || is_float($value)) {
+            return in_array((string) $value, ['1', '0'], true);
+        }
+
+        return is_string($value) && in_array(mb_strtolower(trim($value)), ['true', 'false', 'yes', 'no', 'y', 'n', 't', 'f', 'on', 'off', '1', '0'], true);
     }
 
     public function isDateLike(mixed $value): bool
@@ -76,5 +99,13 @@ class DatasetTypeDetector
         }
 
         return true;
+    }
+
+    private function normalizeBlankToken(string $value): string
+    {
+        $normalized = mb_strtolower(trim($value));
+        $normalized = trim($normalized, " \t\n\r\0\x0B\"'`.,;:(){}");
+
+        return str_replace([' ', '.', '_'], '', $normalized);
     }
 }

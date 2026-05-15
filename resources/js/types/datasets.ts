@@ -263,7 +263,20 @@ export interface ComparisonPayload {
 }
 
 /** Category classification for a dataset insight. */
-export type InsightCategory = 'trend' | 'distribution' | 'outlier' | 'correlation' | 'segment' | 'quality' | 'general';
+export type InsightCategory =
+    | 'trend'
+    | 'distribution'
+    | 'outlier'
+    | 'correlation'
+    | 'segment'
+    | 'quality'
+    | 'general'
+    | 'ai_general'
+    | 'business_opportunity'
+    | 'data_action'
+    | 'risk_flag'
+    | 'trend_interpretation'
+    | 'anomaly_alert';
 
 /** A single plain-language insight derived from dataset analysis. */
 export interface DatasetInsight {
@@ -271,8 +284,9 @@ export interface DatasetInsight {
     category: InsightCategory;
     title: string;
     description: string;
-    severity: 'info' | 'warning' | 'positive' | 'neutral';
+    severity: 'info' | 'warning' | 'positive' | 'neutral' | 'critical';
     related_column: string | null;
+    business_impact?: string;
     metadata: Record<string, DatasetValue> | null;
 }
 
@@ -281,4 +295,6 @@ export interface DatasetInsightsPayload {
     insights: DatasetInsight[];
     generated_at: string;
     summary: string;
+    ai_insights?: DatasetInsight[];
+    has_insights?: boolean;
 }

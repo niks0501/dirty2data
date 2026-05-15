@@ -110,7 +110,6 @@
         "paths": {
             "@/*": ["./resources/js/*"]
         },
-        "ignoreDeprecations": "6.0" /* Suppress reporting of specified deprecation warnings. */,
         "jsx": "react-jsx"
     },
     "include": [

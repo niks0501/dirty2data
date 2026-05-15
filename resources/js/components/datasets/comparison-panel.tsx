@@ -78,10 +78,7 @@ function extractColumnNames(rows: ComparisonRow[]): string[] {
     return rows[0].cells.map((cell) => cell.header);
 }
 
-function getCellValue(
-    row: ComparisonRow,
-    columnName: string,
-): string {
+function getCellValue(row: ComparisonRow, columnName: string): string {
     const cell = row.cells.find((c) => c.header === columnName);
 
     if (!cell || cell.value === null || cell.value === undefined) {
@@ -98,7 +95,9 @@ function isCellChanged(row: ComparisonRow, columnName: string): boolean {
 }
 
 export default function ComparisonPanel({ datasetId, version = 0 }: Props) {
-    const [comparison, setComparison] = useState<ComparisonPayload | null>(null);
+    const [comparison, setComparison] = useState<ComparisonPayload | null>(
+        null,
+    );
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [page, setPage] = useState(1);
@@ -184,184 +183,192 @@ export default function ComparisonPanel({ datasetId, version = 0 }: Props) {
                     comparison &&
                     comparison.rows.length === 0 && (
                         <div className="rounded-lg bg-[#F1F3F4] p-6 text-center text-sm text-muted-foreground">
-                            <p>No comparison data available yet. Apply cleaning operations first.</p>
+                            <p>
+                                No comparison data available yet. Apply cleaning
+                                operations first.
+                            </p>
                         </div>
                     )}
 
-                {!loading && !error && comparison && comparison.rows.length > 0 && (
-                    <>
-                        {/* Summary stats */}
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                            {statCards.map((card) => (
-                                <div
-                                    key={card.label}
-                                    className="flex items-center gap-3 rounded-lg border p-4"
-                                >
+                {!loading &&
+                    !error &&
+                    comparison &&
+                    comparison.rows.length > 0 && (
+                        <>
+                            {/* Summary stats */}
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                {statCards.map((card) => (
                                     <div
-                                        className={`flex size-10 shrink-0 items-center justify-center rounded-full ${card.bg}`}
+                                        key={card.label}
+                                        className="flex items-center gap-3 rounded-lg border p-4"
                                     >
-                                        <card.icon
-                                            className={`size-5 ${card.color}`}
-                                        />
+                                        <div
+                                            className={`flex size-10 shrink-0 items-center justify-center rounded-full ${card.bg}`}
+                                        >
+                                            <card.icon
+                                                className={`size-5 ${card.color}`}
+                                            />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs text-muted-foreground">
+                                                {card.label}
+                                            </p>
+                                            <p className="text-lg font-semibold text-[#353535] tabular-nums">
+                                                {card.value.toLocaleString()}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="min-w-0">
-                                        <p className="text-xs text-muted-foreground">
-                                            {card.label}
-                                        </p>
-                                        <p className="text-lg font-semibold text-[#353535] tabular-nums">
-                                            {card.value.toLocaleString()}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Comparison table */}
-                        <div className="overflow-x-auto rounded-lg border">
-                            <table className="w-full text-sm">
-                                <thead className="sticky top-0 z-10 bg-[#F1F3F4]">
-                                    <tr>
-                                        <th className="w-12 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
-                                            #
-                                        </th>
-                                        <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
-                                            Status
-                                        </th>
-                                        {columnNames.map((colName) => (
-                                            <th
-                                                key={colName}
-                                                className="whitespace-nowrap px-3 py-2 text-left text-xs font-medium text-muted-foreground"
-                                            >
-                                                {colName}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {comparison.rows.map((row) => {
-                                        const rowStyle =
-                                            row.status === 'modified'
-                                                ? 'bg-[#FEF3C7]/30'
-                                                : row.status === 'removed'
-                                                  ? 'bg-[#FDECEC]/30'
-                                                  : row.status === 'added'
-                                                    ? 'bg-[#E8F5E9]/30'
-                                                    : '';
-
-                                        return (
-                                            <tr
-                                                key={`${row.rowNumber}-${row.status}`}
-                                                className={`border-t transition-colors hover:bg-[#F7F9FA] ${rowStyle}`}
-                                            >
-                                                <td className="px-3 py-2 text-xs text-muted-foreground">
-                                                    {row.rowNumber}
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <span
-                                                        className="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                                                        style={{
-                                                            backgroundColor:
-                                                                row.status ===
-                                                                    'modified'
-                                                                    ? '#FEF3C7'
-                                                                    : row.status ===
-                                                                        'removed'
-                                                                      ? '#FDECEC'
-                                                                      : row.status ===
-                                                                          'added'
-                                                                        ? '#E8F5E9'
-                                                                        : '#E0F2FE',
-                                                            color:
-                                                                row.status ===
-                                                                    'modified'
-                                                                    ? '#92400E'
-                                                                    : row.status ===
-                                                                        'removed'
-                                                                      ? '#C62828'
-                                                                      : row.status ===
-                                                                          'added'
-                                                                        ? '#2E7D32'
-                                                                        : '#0284C7',
-                                                        }}
-                                                    >
-                                                        {row.status}
-                                                    </span>
-                                                </td>
-                                                {columnNames.map(
-                                                    (colName) => {
-                                                        const changed =
-                                                            isCellChanged(
-                                                                row,
-                                                                colName,
-                                                            );
-                                                        const value =
-                                                            getCellValue(
-                                                                row,
-                                                                colName,
-                                                            );
-
-                                                        return (
-                                                            <td
-                                                                key={colName}
-                                                                className={`max-w-[260px] truncate whitespace-nowrap px-3 py-2 ${
-                                                                    changed
-                                                                        ? 'border border-[#2E7D32]/20 bg-[#E8F5E9]'
-                                                                        : ''
-                                                                }`}
-                                                            >
-                                                                {value}
-                                                            </td>
-                                                        );
-                                                    },
-                                                )}
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="flex items-center justify-between">
-                                <p className="text-xs text-muted-foreground">
-                                    Page {page} of {totalPages}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={page <= 1}
-                                        onClick={() =>
-                                            setPage((prev) =>
-                                                Math.max(prev - 1, 1),
-                                            )
-                                        }
-                                    >
-                                        <ChevronLeft className="size-4" />
-                                        Previous
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={page >= totalPages}
-                                        onClick={() =>
-                                            setPage((prev) =>
-                                                Math.min(
-                                                    prev + 1,
-                                                    totalPages,
-                                                ),
-                                            )
-                                        }
-                                    >
-                                        Next
-                                        <ChevronRight className="size-4" />
-                                    </Button>
-                                </div>
+                                ))}
                             </div>
-                        )}
-                    </>
-                )}
+
+                            {/* Comparison table */}
+                            <div className="overflow-x-auto rounded-lg border">
+                                <table className="w-full text-sm">
+                                    <thead className="sticky top-0 z-10 bg-[#F1F3F4]">
+                                        <tr>
+                                            <th className="w-12 px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                                                #
+                                            </th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
+                                                Status
+                                            </th>
+                                            {columnNames.map((colName) => (
+                                                <th
+                                                    key={colName}
+                                                    className="px-3 py-2 text-left text-xs font-medium whitespace-nowrap text-muted-foreground"
+                                                >
+                                                    {colName}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {comparison.rows.map((row) => {
+                                            const rowStyle =
+                                                row.status === 'modified'
+                                                    ? 'bg-[#FEF3C7]/30'
+                                                    : row.status === 'removed'
+                                                      ? 'bg-[#FDECEC]/30'
+                                                      : row.status === 'added'
+                                                        ? 'bg-[#E8F5E9]/30'
+                                                        : '';
+
+                                            return (
+                                                <tr
+                                                    key={`${row.rowNumber}-${row.status}`}
+                                                    className={`border-t transition-colors hover:bg-[#F7F9FA] ${rowStyle}`}
+                                                >
+                                                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                                                        {row.rowNumber}
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                        <span
+                                                            className="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    row.status ===
+                                                                    'modified'
+                                                                        ? '#FEF3C7'
+                                                                        : row.status ===
+                                                                            'removed'
+                                                                          ? '#FDECEC'
+                                                                          : row.status ===
+                                                                              'added'
+                                                                            ? '#E8F5E9'
+                                                                            : '#E0F2FE',
+                                                                color:
+                                                                    row.status ===
+                                                                    'modified'
+                                                                        ? '#92400E'
+                                                                        : row.status ===
+                                                                            'removed'
+                                                                          ? '#C62828'
+                                                                          : row.status ===
+                                                                              'added'
+                                                                            ? '#2E7D32'
+                                                                            : '#0284C7',
+                                                            }}
+                                                        >
+                                                            {row.status}
+                                                        </span>
+                                                    </td>
+                                                    {columnNames.map(
+                                                        (colName) => {
+                                                            const changed =
+                                                                isCellChanged(
+                                                                    row,
+                                                                    colName,
+                                                                );
+                                                            const value =
+                                                                getCellValue(
+                                                                    row,
+                                                                    colName,
+                                                                );
+
+                                                            return (
+                                                                <td
+                                                                    key={
+                                                                        colName
+                                                                    }
+                                                                    className={`max-w-[260px] truncate px-3 py-2 whitespace-nowrap ${
+                                                                        changed
+                                                                            ? 'border border-[#2E7D32]/20 bg-[#E8F5E9]'
+                                                                            : ''
+                                                                    }`}
+                                                                >
+                                                                    {value}
+                                                                </td>
+                                                            );
+                                                        },
+                                                    )}
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs text-muted-foreground">
+                                        Page {page} of {totalPages}
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={page <= 1}
+                                            onClick={() =>
+                                                setPage((prev) =>
+                                                    Math.max(prev - 1, 1),
+                                                )
+                                            }
+                                        >
+                                            <ChevronLeft className="size-4" />
+                                            Previous
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={page >= totalPages}
+                                            onClick={() =>
+                                                setPage((prev) =>
+                                                    Math.min(
+                                                        prev + 1,
+                                                        totalPages,
+                                                    ),
+                                                )
+                                            }
+                                        >
+                                            Next
+                                            <ChevronRight className="size-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
             </CardContent>
         </Card>
     );

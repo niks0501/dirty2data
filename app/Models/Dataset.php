@@ -72,6 +72,16 @@ class Dataset extends Model
     }
 
     /**
+     * Get AI-generated insights for this dataset.
+     *
+     * @return HasMany<DatasetAiInsight, $this>
+     */
+    public function aiInsights(): HasMany
+    {
+        return $this->hasMany(DatasetAiInsight::class);
+    }
+
+    /**
      * Get the latest 'before' quality score (pre-cleaning baseline).
      */
     public function latestBeforeQualityScore(): ?DatasetQualityScore

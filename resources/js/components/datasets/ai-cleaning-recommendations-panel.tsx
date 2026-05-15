@@ -139,37 +139,44 @@ export default function AiCleaningRecommendationsPanel({
         setApplyingId(recommendationId);
         setError(null);
 
-        const response = await fetch(
-            `/datasets/${dataset.id}/cleaning/recommendations/${recommendationId}/apply`,
-            {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken(),
+        try {
+            const response = await fetch(
+                `/datasets/${dataset.id}/cleaning/recommendations/${recommendationId}/apply`,
+                {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken(),
+                    },
+                    body: JSON.stringify({ confirmed: true }),
                 },
-                body: JSON.stringify({ confirmed: true }),
-            },
-        );
+            );
 
-        const payload = await response.json();
-        setApplyingId(null);
+            const payload = await response.json();
 
-        if (!response.ok) {
-            const messages = Object.values(payload.errors ?? {}).flat();
-            setError(String(messages[0] ?? 'Unable to apply recommendation.'));
+            if (!response.ok) {
+                const messages = Object.values(payload.errors ?? {}).flat();
+                setError(
+                    String(messages[0] ?? 'Unable to apply recommendation.'),
+                );
 
-            return;
+                return;
+            }
+
+            router.reload({
+                only: ['dataset', 'qualityScore'],
+                onSuccess: (page) => {
+                    onDatasetUpdated(page.props.dataset as DatasetPageProps);
+                },
+            });
+            await loadRecommendations();
+            setPreview(null);
+        } catch {
+            setError('Failed to apply recommendation. Please try again.');
+        } finally {
+            setApplyingId(null);
         }
-
-        router.reload({
-            only: ['dataset', 'qualityScore'],
-            onSuccess: (page) => {
-                onDatasetUpdated(page.props.dataset as DatasetPageProps);
-            },
-        });
-        await loadRecommendations();
-        setPreview(null);
     }
 
     async function dismissRecommendation(recommendationId: number) {

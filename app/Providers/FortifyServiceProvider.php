@@ -95,5 +95,9 @@ class FortifyServiceProvider extends ServiceProvider
 
             return Limit::perMinute(5)->by($throttleKey);
         });
+
+        RateLimiter::for('ai-insights', function (Request $request) {
+            return Limit::perMinutes(10, 5)->by($request->user()?->id ?: $request->ip());
+        });
     }
 }

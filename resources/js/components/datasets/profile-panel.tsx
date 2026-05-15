@@ -194,15 +194,31 @@ export default function ProfilePanel({ profile }: Props) {
                     <table className="w-full text-sm">
                         <thead className="bg-[#F1F3F4]">
                             <tr>
-                                <th className="px-3 py-2 text-left">Column</th>
-                                <th className="px-3 py-2 text-left">Type</th>
-                                <th className="px-3 py-2 text-left">Missing</th>
-                                <th className="px-3 py-2 text-left">Unique</th>
-                                <th className="px-3 py-2 text-left">Min</th>
-                                <th className="px-3 py-2 text-left">Max</th>
-                                <th className="px-3 py-2 text-left">Avg</th>
-                                <th className="px-3 py-2 text-left">Median</th>
-                                <th className="px-3 py-2 text-left">
+                                <th className="sticky top-0 bg-[#F1F3F4] px-3 py-2 text-left">
+                                    Column
+                                </th>
+                                <th className="sticky top-0 bg-[#F1F3F4] px-3 py-2 text-left">
+                                    Type
+                                </th>
+                                <th className="sticky top-0 bg-[#F1F3F4] px-3 py-2 text-left">
+                                    Missing
+                                </th>
+                                <th className="sticky top-0 bg-[#F1F3F4] px-3 py-2 text-left">
+                                    Unique
+                                </th>
+                                <th className="sticky top-0 bg-[#F1F3F4] px-3 py-2 text-left">
+                                    Min
+                                </th>
+                                <th className="sticky top-0 bg-[#F1F3F4] px-3 py-2 text-left">
+                                    Max
+                                </th>
+                                <th className="sticky top-0 bg-[#F1F3F4] px-3 py-2 text-left">
+                                    Avg
+                                </th>
+                                <th className="sticky top-0 bg-[#F1F3F4] px-3 py-2 text-left">
+                                    Median
+                                </th>
+                                <th className="sticky top-0 bg-[#F1F3F4] px-3 py-2 text-left">
                                     Most Frequent
                                 </th>
                             </tr>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Datasets;
 
+use App\Exports\CleanedDatasetExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Datasets\ChartDatasetRequest;
 use App\Http\Requests\Datasets\CleanDatasetRequest;
@@ -11,12 +12,13 @@ use App\Jobs\ProcessDatasetUpload;
 use App\Models\Dataset;
 use App\Models\DatasetCleaningRecommendation;
 use App\Models\DatasetQualityScore;
+use App\Services\AI\BusinessInsightManager;
+use App\Services\Datasets\DatasetAiContextBuilder;
 use App\Services\Datasets\DatasetChartBuilder;
 use App\Services\Datasets\DatasetChartRecommender;
 use App\Services\Datasets\DatasetCleaner;
 use App\Services\Datasets\DatasetCleaningPreviewer;
 use App\Services\Datasets\DatasetComparisonBuilder;
-use App\Services\Datasets\DatasetInsightsBuilder;
 use App\Services\Datasets\DatasetPreviewParser;
 use App\Services\Datasets\DatasetProfiler;
 use App\Services\Datasets\DatasetQualityScoreClient;
@@ -29,6 +31,9 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Excel as ExcelWriter;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class DatasetController extends Controller
 {
@@ -332,13 +337,143 @@ class DatasetController extends Controller
         );
     }
 
-    public function insights(Request $request, Dataset $dataset, DatasetInsightsBuilder $insightsBuilder): JsonResponse
+    public function export(Request $request, Dataset $dataset): BinaryFileResponse
     {
         $this->authorizeDataset($request, $dataset);
 
-        return response()->json(
-            $insightsBuilder->build($dataset)
+        $validated = $request->validate([
+            'format' => ['required', 'in:csv,xlsx'],
+            'columns' => ['nullable', 'array'],
+            'columns.*' => ['string'],
+        ]);
+
+        $headers = $dataset->headers ?? [];
+        $selectedColumns = array_values(array_intersect($validated['columns'] ?? $headers, $headers));
+
+        if ($selectedColumns === []) {
+            $selectedColumns = $headers;
+        }
+
+        $format = (string) $validated['format'];
+        $extension = $format === 'xlsx' ? 'xlsx' : 'csv';
+        $writerType = $format === 'xlsx' ? ExcelWriter::XLSX : ExcelWriter::CSV;
+        $baseName = trim((string) Str::of(pathinfo($dataset->original_name, PATHINFO_FILENAME))
+            ->replaceMatches('/[\\/:*?"<>|]+/', '_'), ' ._');
+
+        if ($baseName === '') {
+            $baseName = 'dataset';
+        }
+
+        return Excel::download(
+            new CleanedDatasetExport($dataset->cleaned_records ?? [], $selectedColumns),
+            $baseName.'_cleaned.'.$extension,
+            $writerType,
         );
+    }
+
+    public function insights(Request $request, Dataset $dataset): JsonResponse
+    {
+        $this->authorizeDataset($request, $dataset);
+
+        $aiInsights = $dataset->aiInsights()
+            ->latest()
+            ->get()
+            ->map(fn ($i) => [
+                'id' => 'ai_'.$i->id,
+                'category' => $i->category,
+                'title' => $i->title,
+                'description' => $i->description,
+                'severity' => $i->severity,
+                'related_column' => $i->related_column,
+                'business_impact' => $i->metadata['business_impact'] ?? '',
+                'metadata' => $i->metadata,
+            ])
+            ->values()
+            ->all();
+
+        $hasInsights = count($aiInsights) > 0;
+
+        $lastGenerated = $dataset->aiInsights()
+            ->latest()
+            ->first()?->created_at?->toIso8601String() ?? null;
+
+        return response()->json([
+            'insights' => [],
+            'generated_at' => $lastGenerated ?? now()->toIso8601String(),
+            'summary' => '',
+            'ai_insights' => $aiInsights,
+            'has_insights' => $hasInsights,
+        ]);
+    }
+
+    public function generateAiInsights(Request $request, Dataset $dataset, BusinessInsightManager $manager, DatasetAiContextBuilder $contextBuilder): JsonResponse
+    {
+        $this->authorizeDataset($request, $dataset);
+
+        $context = $contextBuilder->build($dataset);
+
+        $qualityScore = $dataset->latestAfterQualityScore() ?? $dataset->latestBeforeQualityScore();
+
+        if ($qualityScore) {
+            $context['quality_score'] = [
+                'overall' => $qualityScore->quality_score,
+                'before_cleaning' => $dataset->latestBeforeQualityScore()?->quality_score,
+                'after_cleaning' => $dataset->latestAfterQualityScore()?->quality_score,
+                'sub_scores' => [
+                    'completeness' => $qualityScore->completeness_score,
+                    'uniqueness' => $qualityScore->uniqueness_score,
+                    'validity' => $qualityScore->validity_score,
+                    'consistency' => $qualityScore->consistency_score,
+                    'type_accuracy' => $qualityScore->type_accuracy_score,
+                ],
+            ];
+        }
+
+        $cleaningLog = $dataset->cleaning_log ?? [];
+        $context['cleaning_history'] = [
+            'operations_count' => count($cleaningLog),
+            'recent_operations' => array_slice($cleaningLog, -5),
+        ];
+
+        $result = $manager->generate($context);
+
+        $dataset->aiInsights()->delete();
+
+        $models = [];
+        foreach ($result['insights'] as $insight) {
+            $models[] = $dataset->aiInsights()->create([
+                'category' => $insight['category'],
+                'title' => $insight['title'],
+                'description' => $insight['description'],
+                'severity' => $insight['severity'],
+                'related_column' => $insight['related_column'],
+                'metadata' => [
+                    'business_impact' => $insight['business_impact'] ?? '',
+                    'executive_summary' => $result['executive_summary'],
+                    'provider' => $result['provider'],
+                    'model' => $result['model'],
+                    'source' => $result['source'],
+                    'fallback_reason' => $result['fallback_reason'],
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'insights' => [],
+            'generated_at' => now()->toIso8601String(),
+            'summary' => $result['executive_summary'],
+            'ai_insights' => collect($models)->map(fn ($m) => [
+                'id' => 'ai_'.$m->id,
+                'category' => $m->category,
+                'title' => $m->title,
+                'description' => $m->description,
+                'severity' => $m->severity,
+                'related_column' => $m->related_column,
+                'business_impact' => $m->metadata['business_impact'] ?? '',
+                'metadata' => $m->metadata,
+            ])->values()->all(),
+            'has_insights' => count($models) > 0,
+        ]);
     }
 
     /**

@@ -119,13 +119,25 @@ class DatasetCleaner
      */
     private function removeDuplicates(array $records, array $headers, array $input): array
     {
+        $columns = $this->stringList($input['columns'] ?? []);
+
+        foreach ($columns as $column) {
+            $this->ensureColumnExists($records, $headers, $column);
+        }
+
         $seen = [];
         $cleaned = [];
         $removed = 0;
 
         foreach ($records as $record) {
-            $keyRecord = $record;
-            ksort($keyRecord);
+            $keyRecord = $columns === []
+                ? $record
+                : array_intersect_key($record, array_flip($columns));
+
+            if ($columns === []) {
+                ksort($keyRecord);
+            }
+
             $key = json_encode($keyRecord);
 
             if (isset($seen[$key])) {
@@ -138,7 +150,12 @@ class DatasetCleaner
             $cleaned[] = $record;
         }
 
-        return $this->result($cleaned, $headers, 'remove_duplicates', ['removed_rows' => $removed, 'affected_rows' => $removed], $input);
+        return $this->result($cleaned, $headers, 'remove_duplicates', [
+            'columns' => $columns,
+            'duplicate_scope' => $columns === [] ? 'all_columns' : 'selected_columns',
+            'removed_rows' => $removed,
+            'affected_rows' => $removed,
+        ], $input);
     }
 
     /**
@@ -819,8 +836,8 @@ class DatasetCleaner
         $normalized = mb_strtolower(trim((string) $value));
 
         return match ($normalized) {
-            'true', 'yes', '1' => true,
-            'false', 'no', '0' => false,
+            'true', 'yes', 'y', 't', 'on', '1' => true,
+            'false', 'no', 'n', 'f', 'off', '0' => false,
             default => throw new \InvalidArgumentException('Selected column contains values that cannot be converted to boolean.'),
         };
     }
@@ -831,7 +848,11 @@ class DatasetCleaner
             return true;
         }
 
-        return is_string($value) && in_array(mb_strtolower(trim($value)), ['true', 'false', 'yes', 'no', '1', '0'], true);
+        if (is_int($value) || is_float($value)) {
+            return in_array((string) $value, ['1', '0'], true);
+        }
+
+        return is_string($value) && in_array(mb_strtolower(trim($value)), ['true', 'false', 'yes', 'no', 'y', 'n', 't', 'f', 'on', 'off', '1', '0'], true);
     }
 
     /**
@@ -988,9 +1009,34 @@ class DatasetCleaner
             return false;
         }
 
-        $normalized = mb_strtolower(trim($value));
+        $normalized = $this->normalizeBlankToken($value);
 
-        return in_array($normalized, ['', 'n/a', 'na', 'null', 'none', 'missing', 'unknown', '-', '--', '[]'], true);
+        if ($normalized === '' || preg_match('/^-+$/', $normalized) === 1) {
+            return true;
+        }
+
+        return in_array($normalized, [
+            'n/a',
+            '#n/a',
+            'na',
+            'null',
+            'nil',
+            'none',
+            'missing',
+            'unknown',
+            'blank',
+            'notavailable',
+            'notapplicable',
+            '[]',
+        ], true);
+    }
+
+    private function normalizeBlankToken(string $value): string
+    {
+        $normalized = mb_strtolower(trim($value));
+        $normalized = trim($normalized, " \t\n\r\0\x0B\"'`.,;:(){}");
+
+        return str_replace([' ', '.', '_'], '', $normalized);
     }
 
     /**

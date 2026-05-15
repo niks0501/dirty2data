@@ -42,19 +42,3 @@ npm run dev | build | lint | lint:check | format | format:check | types:check
 - `lint.yml` runs Pint + Prettier + ESLint with auto-fix (not check-only).
 - `tests.yml` runs on PHP 8.3/8.4 + Node 22, builds assets before Pest.
 
-## Workflow skill library
-
-A reusable workflow skill library exists at `skills/opencode-workflow-team/`.
-Use it as a progressive knowledge base for planning, implementation, review, testing, security, and release.
-
-Rules:
-
-- First read `skills/opencode-workflow-team/references/index.md`.
-- Load only the playbooks relevant to the current task.
-- Never load the entire `skills/` folder just to start a task.
-- For small tasks, prefer `/team-lite`.
-- For standard features, prefer `/feature-team`.
-- For high-risk or large changes, use `/enterprise-feature`.
-- For browser automation, use Playwright CLI: `npx playwright test`.
-- Do not use Playwright MCP for UI testing because it increases context and tool overhead.
-- Before final response, check `skills/opencode-workflow-team/references/templates/final-report-template.md`.

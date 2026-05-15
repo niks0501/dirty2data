@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Datasets;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessAfterQualityScore;
 use App\Models\CleaningRecipe;
 use App\Models\Dataset;
 use App\Services\Datasets\DatasetCleaner;
@@ -83,12 +84,15 @@ class CleaningRecipeController extends Controller
 
         $results = [];
         $records = $dataset->cleaned_records ?? [];
+        $headers = $dataset->headers ?? [];
         $log = $dataset->cleaning_log ?? [];
+        $snapshots = $cleaner->pushSnapshot($dataset);
 
         foreach ($recipe->steps as $step) {
             try {
-                $result = $cleaner->clean($dataset, $step, $records);
+                $result = $cleaner->clean($dataset, $step, $records, $headers);
                 $records = $result['records'];
+                $headers = $result['headers'];
                 $log[] = $result['log'];
                 $results[] = [
                     'operation' => $step['operation'],
@@ -104,14 +108,21 @@ class CleaningRecipeController extends Controller
             }
         }
 
-        $profile = $profiler->profile($records, $dataset->headers ?? []);
+        $profile = $profiler->profile($records, $headers);
 
         $dataset->update([
+            'headers' => $headers,
             'cleaned_records' => $records,
             'row_count' => count($records),
+            'column_count' => count($headers),
             'profile' => $profile,
             'cleaning_log' => $log,
+            'cleaning_snapshots' => $snapshots,
         ]);
+
+        if (collect($results)->contains(fn (array $result): bool => $result['success'] === true)) {
+            ProcessAfterQualityScore::dispatch($dataset, $profile)->afterResponse();
+        }
 
         return response()->json([
             'results' => $results,

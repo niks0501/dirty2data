@@ -19,6 +19,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('datasets/{dataset}', [DatasetController::class, 'show'])->name('datasets.show');
     Route::post('datasets/{dataset}/clean', [DatasetController::class, 'clean'])->name('datasets.clean');
     Route::post('datasets/{dataset}/clean/preview', [DatasetController::class, 'previewClean'])->name('datasets.clean.preview');
+    Route::get('datasets/{dataset}/export', [DatasetController::class, 'export'])->name('datasets.export');
     Route::get('datasets/{dataset}/cleaning/recommendations', [DatasetCleaningRecommendationController::class, 'index'])->name('datasets.cleaning.recommendations.index');
     Route::post('datasets/{dataset}/cleaning/recommendations/generate', [DatasetCleaningRecommendationController::class, 'generate'])
         ->name('datasets.cleaning.recommendations.generate')
@@ -29,6 +30,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('datasets/{dataset}/chart', [DatasetController::class, 'chart'])->name('datasets.chart');
     Route::get('datasets/{dataset}/comparison', [DatasetController::class, 'comparison'])->name('datasets.comparison');
     Route::get('datasets/{dataset}/insights', [DatasetController::class, 'insights'])->name('datasets.insights');
+    Route::post('datasets/{dataset}/insights/ai', [DatasetController::class, 'generateAiInsights'])
+        ->name('datasets.insights.ai')
+        ->middleware('throttle:ai-insights');
 
     Route::post('datasets/{dataset}/undo', [DatasetUndoController::class, 'undoLast'])->name('datasets.undo');
     Route::post('datasets/{dataset}/undo/{index}', [DatasetUndoController::class, 'undoTo'])->whereNumber('index')->name('datasets.undoTo');

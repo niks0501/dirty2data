@@ -217,3 +217,65 @@ test('AI recommendation preview is required before applying deterministic steps'
         ->and($dataset->cleaning_log[0]['source'])->toBe('ai_recommendation')
         ->and($dataset->cleaning_snapshots)->toHaveCount(1);
 });
+
+test('cleaned dataset export downloads csv with default columns', function () {
+    $user = User::factory()->create();
+    $records = [
+        ['Name' => 'Ada', 'Age' => '34'],
+        ['Name' => 'Grace', 'Age' => '40'],
+    ];
+    $dataset = Dataset::factory()->create([
+        'uploaded_by_id' => $user->id,
+        'headers' => ['Name', 'Age'],
+        'original_records' => $records,
+        'cleaned_records' => $records,
+        'original_name' => 'test_data.csv',
+    ]);
+
+    $response = $this
+        ->actingAs($user)
+        ->get(route('datasets.export', ['dataset' => $dataset, 'format' => 'csv']));
+
+    $response->assertOk()
+        ->assertHeader('Content-Type', 'text/csv; charset=utf-8')
+        ->assertHeader('Content-Disposition', 'attachment; filename=test_data_cleaned.csv');
+});
+
+test('cleaned dataset export with selected columns only outputs those columns', function () {
+    $user = User::factory()->create();
+    $records = [
+        ['Name' => 'Ada', 'Age' => '34', 'City' => 'London'],
+    ];
+    $dataset = Dataset::factory()->create([
+        'uploaded_by_id' => $user->id,
+        'headers' => ['Name', 'Age', 'City'],
+        'original_records' => $records,
+        'cleaned_records' => $records,
+    ]);
+
+    $response = $this
+        ->actingAs($user)
+        ->get(route('datasets.export', [
+            'dataset' => $dataset,
+            'format' => 'xlsx',
+            'columns' => ['Name'],
+        ]));
+
+    $response->assertOk();
+    $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});
+
+test('export requires valid format csv or xlsx', function () {
+    $user = User::factory()->create();
+    $dataset = Dataset::factory()->create([
+        'uploaded_by_id' => $user->id,
+        'headers' => ['A'],
+        'original_records' => [['A' => '1']],
+        'cleaned_records' => [['A' => '1']],
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->get(route('datasets.export', ['dataset' => $dataset, 'format' => 'pdf']))
+        ->assertSessionHasErrors('format');
+});

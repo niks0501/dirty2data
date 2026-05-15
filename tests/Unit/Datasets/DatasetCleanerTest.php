@@ -167,3 +167,99 @@ test('dataset cleaner supports schema-changing split rename and remove operation
             'Comment' => 'keep',
         ]);
 });
+
+test('column-specific duplicate removal deduplicates by selected columns', function () {
+    $records = [
+        ['Name' => 'Ada', 'Age' => '34', 'City' => 'London'],
+        ['Name' => 'Ada', 'Age' => '35', 'City' => 'London'],
+        ['Name' => 'Grace', 'Age' => '40', 'City' => 'Paris'],
+    ];
+    $dataset = new Dataset([
+        'headers' => ['Name', 'Age', 'City'],
+        'original_records' => $records,
+        'cleaned_records' => $records,
+    ]);
+
+    $result = (new DatasetCleaner)->clean($dataset, [
+        'operation' => 'remove_duplicates',
+        'columns' => ['Name', 'City'],
+    ]);
+
+    expect($result['records'])->toHaveCount(2);
+    expect($result['summary']['duplicate_scope'])->toBe('selected_columns');
+    expect($result['summary']['removed_rows'])->toBe(1);
+});
+
+test('column-specific duplicate removal keeps all rows when no column match', function () {
+    $records = [
+        ['Name' => 'Ada', 'Age' => '30'],
+        ['Name' => 'Grace', 'Age' => '40'],
+    ];
+    $dataset = new Dataset([
+        'headers' => ['Name', 'Age'],
+        'original_records' => $records,
+        'cleaned_records' => $records,
+    ]);
+
+    $result = (new DatasetCleaner)->clean($dataset, [
+        'operation' => 'remove_duplicates',
+        'columns' => ['Name'],
+    ]);
+
+    expect($result['records'])->toHaveCount(2);
+    expect($result['summary']['removed_rows'])->toBe(0);
+});
+
+test('blank detection handles case-insensitive and variant placeholders', function () {
+    $dataset = new Dataset([
+        'headers' => ['Status'],
+        'cleaned_records' => [
+            ['Status' => 'N/A'],
+            ['Status' => 'N.A.'],
+            ['Status' => 'not_available'],
+            ['Status' => '---'],
+            ['Status' => 'null'],
+            ['Status' => 'N u l l'],
+        ],
+    ]);
+
+    $result = (new DatasetCleaner)->clean($dataset, [
+        'operation' => 'fill_missing',
+        'column' => 'Status',
+        'method' => 'custom',
+        'value' => 'FILLED',
+    ]);
+
+    expect($result['summary']['filled_cells'])->toBe(6);
+    foreach ($result['records'] as $record) {
+        expect($record['Status'])->toBe('FILLED');
+    }
+});
+
+test('boolean conversion accepts extended true and false values', function () {
+    $dataset = new Dataset([
+        'headers' => ['Flag'],
+        'cleaned_records' => [
+            ['Flag' => 'y'],
+            ['Flag' => 't'],
+            ['Flag' => 'on'],
+            ['Flag' => 'n'],
+            ['Flag' => 'f'],
+            ['Flag' => 'off'],
+        ],
+    ]);
+
+    $result = (new DatasetCleaner)->clean($dataset, [
+        'operation' => 'convert_type',
+        'column' => 'Flag',
+        'target_type' => 'boolean',
+    ]);
+
+    expect($result['records'][0]['Flag'])->toBeTrue();
+    expect($result['records'][1]['Flag'])->toBeTrue();
+    expect($result['records'][2]['Flag'])->toBeTrue();
+    expect($result['records'][3]['Flag'])->toBeFalse();
+    expect($result['records'][4]['Flag'])->toBeFalse();
+    expect($result['records'][5]['Flag'])->toBeFalse();
+    expect($result['summary']['converted_cells'])->toBe(6);
+});

@@ -45,6 +45,7 @@ type CleaningOperation =
 interface CleaningConfig {
     operation: CleaningOperation;
     column: string;
+    columns: string[];
     method: string;
     value: string;
     target_type: string;
@@ -234,7 +235,7 @@ const actionDefinitions: ActionDefinition[] = [
         title: 'Merge Columns',
         description: 'Combine two columns into one with a separator.',
         whyDoThis:
-            "Splitting related information across columns makes analysis harder. Merging creates a cleaner, more readable field for labels, names, or combined identifiers.",
+            'Splitting related information across columns makes analysis harder. Merging creates a cleaner, more readable field for labels, names, or combined identifiers.',
         whenToUse:
             "When two columns contain parts of the same information (e.g., 'First Name' and 'Last Name', or 'City' and 'Country').",
         example:
@@ -296,6 +297,7 @@ export default function CleaningPanel({ dataset, onDatasetUpdated }: Props) {
     const [config, setConfig] = useState<CleaningConfig>({
         operation: 'remove_duplicates',
         column: dataset.headers[0] ?? '',
+        columns: dataset.headers,
         method: 'mode',
         value: '',
         target_type: 'numeric',
@@ -370,6 +372,8 @@ export default function CleaningPanel({ dataset, onDatasetUpdated }: Props) {
 
     const requiresColumn = config.operation !== 'remove_duplicates';
     const canApply = preview !== null && preview.operation === config.operation;
+    const duplicateColumnsSelected =
+        config.columns.length === dataset.headers.length;
 
     return (
         <Card>
@@ -440,6 +444,79 @@ export default function CleaningPanel({ dataset, onDatasetUpdated }: Props) {
                 </div>
 
                 <div className="grid gap-3 rounded-xl border p-4 md:grid-cols-2 xl:grid-cols-4">
+                    {config.operation === 'remove_duplicates' && (
+                        <div className="space-y-2 md:col-span-2 xl:col-span-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <label className="text-sm font-medium">
+                                    Duplicate match columns
+                                </label>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                        updateConfig(
+                                            'columns',
+                                            duplicateColumnsSelected
+                                                ? []
+                                                : dataset.headers,
+                                        )
+                                    }
+                                >
+                                    {duplicateColumnsSelected
+                                        ? 'Clear all'
+                                        : 'Select all'}
+                                </Button>
+                            </div>
+                            <div className="grid max-h-44 gap-2 overflow-auto rounded-lg bg-[#F7F9FA] p-3 sm:grid-cols-2 lg:grid-cols-3">
+                                {dataset.headers.map((header) => {
+                                    const checked =
+                                        config.columns.includes(header);
+
+                                    return (
+                                        <label
+                                            key={header}
+                                            className="flex items-center gap-2 rounded-md bg-white px-2 py-1.5 text-sm text-[#353535]"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                className="size-4 accent-[#284B63]"
+                                                checked={checked}
+                                                onChange={(event) => {
+                                                    updateConfig(
+                                                        'columns',
+                                                        event.target.checked
+                                                            ? dataset.headers.filter(
+                                                                  (column) =>
+                                                                      column ===
+                                                                          header ||
+                                                                      config.columns.includes(
+                                                                          column,
+                                                                      ),
+                                                              )
+                                                            : config.columns.filter(
+                                                                  (column) =>
+                                                                      column !==
+                                                                      header,
+                                                              ),
+                                                    );
+                                                }}
+                                            />
+                                            <span className="truncate">
+                                                {header}
+                                            </span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Select one or more columns to detect duplicates
+                                by keys such as email or ID. Select all columns
+                                for exact-row duplicate removal.
+                            </p>
+                        </div>
+                    )}
+
                     {requiresColumn && (
                         <div className="space-y-2">
                             <label className="text-sm font-medium">
@@ -825,10 +902,7 @@ export default function CleaningPanel({ dataset, onDatasetUpdated }: Props) {
                                     type="number"
                                     value={config.min}
                                     onChange={(event) =>
-                                        updateConfig(
-                                            'min',
-                                            event.target.value,
-                                        )
+                                        updateConfig('min', event.target.value)
                                     }
                                     placeholder="0"
                                 />
@@ -841,10 +915,7 @@ export default function CleaningPanel({ dataset, onDatasetUpdated }: Props) {
                                     type="number"
                                     value={config.max}
                                     onChange={(event) =>
-                                        updateConfig(
-                                            'max',
-                                            event.target.value,
-                                        )
+                                        updateConfig('max', event.target.value)
                                     }
                                     placeholder="100"
                                 />

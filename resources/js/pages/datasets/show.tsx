@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -9,10 +9,11 @@ import {
     Loader2,
     Rows3,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AiCleaningRecommendationsPanel from '@/components/datasets/ai-cleaning-recommendations-panel';
 import AttributePanel from '@/components/datasets/attribute-panel';
 import ChartPanel from '@/components/datasets/chart-panel';
+import CleanedDatasetExportPanel from '@/components/datasets/cleaned-dataset-export-panel';
 import CleaningAuditLog from '@/components/datasets/cleaning-audit-log';
 import CleaningPanel from '@/components/datasets/cleaning-panel';
 import ComparisonPanel from '@/components/datasets/comparison-panel';
@@ -76,11 +77,33 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
     const [currentAfterScore, setCurrentAfterScore] = useState(afterScore);
     const [comparisonVersion, setComparisonVersion] = useState(0);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const page = usePage<Record<string, unknown>>();
+    const pageRef = useRef(page);
 
-    const handleDatasetUpdated = (updated: DatasetPageProps) => {
+    useEffect(() => {
+        pageRef.current = page;
+    });
+
+    const handleDatasetUpdated = useCallback((updated: DatasetPageProps) => {
         setCurrentDataset(updated);
+        setCurrentBeforeScore(
+            (pageRef.current.props.beforeScore as DatasetQualityScore | null) ??
+                null,
+        );
+
+        const hasCleaning = (updated.cleaningLog?.length ?? 0) > 0;
+
+        if (hasCleaning) {
+            setCurrentAfterScore(null);
+        } else {
+            setCurrentAfterScore(
+                (pageRef.current.props
+                    .afterScore as DatasetQualityScore | null) ?? null,
+            );
+        }
+
         setComparisonVersion((v) => v + 1);
-    };
+    }, []);
 
     const isProcessing = currentDataset.status === 'processing';
     const isFailed = currentDataset.status === 'failed';
@@ -119,8 +142,14 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
                     const updated = page.props.dataset as DatasetPageProps;
 
                     setCurrentDataset(updated);
-                    setCurrentBeforeScore((page.props.beforeScore as DatasetQualityScore | null) ?? null);
-                    setCurrentAfterScore((page.props.afterScore as DatasetQualityScore | null) ?? null);
+                    setCurrentBeforeScore(
+                        (page.props
+                            .beforeScore as DatasetQualityScore | null) ?? null,
+                    );
+                    setCurrentAfterScore(
+                        (page.props.afterScore as DatasetQualityScore | null) ??
+                            null,
+                    );
 
                     if (updated.status !== 'processing') {
                         if (pollingRef.current) {
@@ -139,6 +168,66 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
             }
         };
     }, [isProcessing]);
+
+    useEffect(() => {
+        const hasCleaning = (currentDataset.cleaningLog?.length ?? 0) > 0;
+        const needsScoreRefresh =
+            hasCleaning &&
+            !currentAfterScore &&
+            currentDataset.status === 'ready';
+
+        if (!needsScoreRefresh) {
+            return;
+        }
+
+        let cancelled = false;
+        let attempts = 0;
+        const maxAttempts = 15;
+
+        const scorePoll = setInterval(() => {
+            if (cancelled) {
+                clearInterval(scorePoll);
+
+                return;
+            }
+
+            attempts++;
+
+            if (attempts > maxAttempts) {
+                clearInterval(scorePoll);
+
+                return;
+            }
+
+            router.reload({
+                only: ['beforeScore', 'afterScore'],
+                onSuccess: (page) => {
+                    const newBefore =
+                        (page.props
+                            .beforeScore as DatasetQualityScore | null) ?? null;
+                    const newAfter =
+                        (page.props.afterScore as DatasetQualityScore | null) ??
+                        null;
+
+                    setCurrentBeforeScore(newBefore);
+                    setCurrentAfterScore(newAfter);
+
+                    if (newAfter) {
+                        clearInterval(scorePoll);
+                    }
+                },
+            });
+        }, 2000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(scorePoll);
+        };
+    }, [
+        currentDataset.status,
+        currentDataset.cleaningLog?.length,
+        currentAfterScore,
+    ]);
 
     const summaryCards = [
         {
@@ -309,12 +398,19 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
                         )}
 
                         {currentBeforeScore && (
-                            <QualityScoreCard score={currentBeforeScore} label="Before Cleaning" />
+                            <QualityScoreCard
+                                score={currentBeforeScore}
+                                label="Before Cleaning"
+                            />
                         )}
 
-                        {currentAfterScore && (
-                            <QualityScoreCard score={currentAfterScore} label="After Cleaning" />
-                        )}
+                        {currentAfterScore &&
+                            (currentDataset.cleaningLog?.length ?? 0) > 0 && (
+                                <QualityScoreCard
+                                    score={currentAfterScore}
+                                    label="After Cleaning"
+                                />
+                            )}
 
                         <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
                             <AttributePanel
@@ -328,6 +424,7 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
                         </div>
 
                         <DatasetPreviewTable dataset={currentDataset} />
+                        <CleanedDatasetExportPanel dataset={currentDataset} />
                         <ProfilePanel profile={currentDataset.profile} />
                         <ComparisonPanel
                             datasetId={currentDataset.id}
@@ -355,7 +452,10 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
                             onDatasetUpdated={setCurrentDataset}
                         />
                         <ChartPanel dataset={currentDataset} />
-                        <InsightsPanel datasetId={currentDataset.id} />
+                        <InsightsPanel
+                            datasetId={currentDataset.id}
+                            version={comparisonVersion}
+                        />
                     </>
                 )}
             </div>

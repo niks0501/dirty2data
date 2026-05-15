@@ -97,7 +97,7 @@ class DatasetQualityScoreClient
 
             $response = $request->post($baseUrl.'/quality-scores', [
                 'score_type' => $scoreType,
-                'profile_metrics' => $profileMetrics,
+                'profile_metrics' => $this->mapProfileMetricsToPython($profileMetrics),
             ]);
         } catch (ConnectionException $e) {
             Log::error('Python data service unreachable.', [
@@ -129,5 +129,26 @@ class DatasetQualityScoreClient
         }
 
         return $body;
+    }
+
+    /**
+     * Map PHP-generated profile metrics to the schema expected by the Python service.
+     *
+     * @param  array<string, mixed>  $metrics
+     * @return array<string, mixed>
+     */
+    private function mapProfileMetricsToPython(array $metrics): array
+    {
+        if (isset($metrics['columns']) && is_array($metrics['columns'])) {
+            $metrics['columns'] = array_map(function (array $col): array {
+                if (! isset($col['detected_type']) && isset($col['type'])) {
+                    $col['detected_type'] = $col['type'];
+                }
+
+                return $col;
+            }, $metrics['columns']);
+        }
+
+        return $metrics;
     }
 }
