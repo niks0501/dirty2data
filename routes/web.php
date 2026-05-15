@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Datasets\CleaningRecipeController;
 use App\Http\Controllers\Datasets\DatasetCleaningRecommendationController;
 use App\Http\Controllers\Datasets\DatasetController;
@@ -12,7 +13,7 @@ Route::inertia('/', 'welcome', [
 ])->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'dashboard')->name('dashboard');
+    Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::get('datasets', [DatasetController::class, 'index'])->name('datasets.index');
     Route::post('datasets', [DatasetController::class, 'store'])->name('datasets.store');
@@ -28,6 +29,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('datasets/{dataset}/cleaning/recommendations/{recommendation}/apply', [DatasetCleaningRecommendationController::class, 'apply'])->name('datasets.cleaning.recommendations.apply');
     Route::post('datasets/{dataset}/cleaning/recommendations/{recommendation}/reject', [DatasetCleaningRecommendationController::class, 'reject'])->name('datasets.cleaning.recommendations.reject');
     Route::get('datasets/{dataset}/chart', [DatasetController::class, 'chart'])->name('datasets.chart');
+    Route::get('datasets/{dataset}/correlation', [DatasetController::class, 'correlation'])->name('datasets.correlation');
+    Route::get('datasets/{dataset}/box-plot', [DatasetController::class, 'boxPlot'])->name('datasets.boxPlot');
+    Route::get('datasets/{dataset}/missing-values', [DatasetController::class, 'missingValues'])->name('datasets.missingValues');
     Route::get('datasets/{dataset}/comparison', [DatasetController::class, 'comparison'])->name('datasets.comparison');
     Route::get('datasets/{dataset}/insights', [DatasetController::class, 'insights'])->name('datasets.insights');
     Route::post('datasets/{dataset}/insights/ai', [DatasetController::class, 'generateAiInsights'])

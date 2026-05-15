@@ -134,7 +134,16 @@ export interface DatasetChartMetadata {
 }
 
 export interface DatasetChartPayload {
-    type: 'bar' | 'line' | 'pie' | 'histogram' | 'scatter' | string;
+    type:
+        | 'bar'
+        | 'line'
+        | 'pie'
+        | 'histogram'
+        | 'scatter'
+        | 'correlation_heatmap'
+        | 'box_plot'
+        | 'missing_value_matrix'
+        | string;
     title: string;
     data: Array<{
         name: string;
@@ -241,7 +250,7 @@ export interface ComparisonCell {
 export interface ComparisonRow {
     rowNumber: number;
     status: 'unchanged' | 'modified' | 'added' | 'removed';
-    cells: Array<Record<string, ComparisonCell>>;
+    cells: ComparisonCell[];
 }
 
 /** Summary statistics for a dataset comparison. */

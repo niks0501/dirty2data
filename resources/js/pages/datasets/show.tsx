@@ -29,7 +29,19 @@ import WorkflowSteps from '@/components/datasets/workflow-steps';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { DatasetPageProps, DatasetQualityScore } from '@/types/datasets';
+
+const TAB_STEPS = ['profile', 'clean', 'analyze', 'visualize'] as const;
+type TabStep = (typeof TAB_STEPS)[number];
+
+function tabToStepIndex(tab: TabStep): number {
+    return TAB_STEPS.indexOf(tab) + 1; // 1 = Profile, 2 = Clean, 3 = Analyze, 4 = Visualize
+}
+
+function stepIndexToTab(step: number): TabStep {
+    return TAB_STEPS[Math.min(Math.max(step - 1, 0), TAB_STEPS.length - 1)];
+}
 
 interface Props {
     dataset: DatasetPageProps;
@@ -71,11 +83,38 @@ function formatDateTime(isoString: string | null): string {
     });
 }
 
+function computeMaxUnlockedStep(
+    status: string,
+    cleaningLogLength: number,
+): number {
+    if (status === 'processing' || status === 'failed') {
+        return 0;
+    }
+
+    // Always unlock at least Profile (step 1) when data is ready
+    // Clean (step 2) is unlocked when the dataset is ready
+    // Analyze (step 3) unlocks after any cleaning has been applied
+    // Visualize (step 4) unlocks after cleaning log exists (same gate as analyze for now)
+    if (cleaningLogLength > 0) {
+        return 4; // All steps unlocked after cleaning
+    }
+
+    return 2; // Profile + Clean unlocked when dataset is ready
+}
+
 export default function Show({ dataset, beforeScore, afterScore }: Props) {
     const [currentDataset, setCurrentDataset] = useState(dataset);
     const [currentBeforeScore, setCurrentBeforeScore] = useState(beforeScore);
     const [currentAfterScore, setCurrentAfterScore] = useState(afterScore);
     const [comparisonVersion, setComparisonVersion] = useState(0);
+    const [activeTab, setActiveTab] = useState<TabStep>(() => {
+        // If cleaning has been applied, default to Clean tab (showing results)
+        if ((dataset.cleaningLog?.length ?? 0) > 0) {
+            return 'clean';
+        }
+
+        return 'profile';
+    });
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const page = usePage<Record<string, unknown>>();
     const pageRef = useRef(page);
@@ -107,13 +146,35 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
 
     const isProcessing = currentDataset.status === 'processing';
     const isFailed = currentDataset.status === 'failed';
+    const hasCleaning = (currentDataset.cleaningLog?.length ?? 0) > 0;
 
-    const currentStep =
-        isProcessing || isFailed
-            ? 0
-            : (currentDataset.cleaningLog?.length ?? 0) > 0
-              ? 2
-              : 1;
+    const maxUnlockedStep = computeMaxUnlockedStep(
+        currentDataset.status,
+        currentDataset.cleaningLog?.length ?? 0,
+    );
+
+    const handleStepClick = useCallback(
+        (stepIndex: number) => {
+            if (stepIndex === 0) {
+                // Upload step — navigate to datasets list
+                router.get('/datasets');
+
+                return;
+            }
+
+            const tab = stepIndexToTab(stepIndex);
+
+            if (stepIndex <= maxUnlockedStep) {
+                setActiveTab(tab);
+            }
+        },
+        [maxUnlockedStep],
+    );
+
+    // Sync activeTab → currentStep for the stepper display
+    const visibleStep = tabToStepIndex(activeTab);
+    const displayStep =
+        activeTab === 'profile' && !hasCleaning ? 1 : visibleStep;
 
     const [selectedColumn, setSelectedColumn] = useState(
         currentDataset.selectedColumn ?? currentDataset.headers[0] ?? null,
@@ -170,7 +231,6 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
     }, [isProcessing]);
 
     useEffect(() => {
-        const hasCleaning = (currentDataset.cleaningLog?.length ?? 0) > 0;
         const needsScoreRefresh =
             hasCleaning &&
             !currentAfterScore &&
@@ -227,6 +287,7 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
         currentDataset.status,
         currentDataset.cleaningLog?.length,
         currentAfterScore,
+        hasCleaning,
     ]);
 
     const summaryCards = [
@@ -277,9 +338,13 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
                     </Button>
                 </div>
 
-                <WorkflowSteps currentStep={currentStep} />
+                <WorkflowSteps
+                    currentStep={displayStep}
+                    maxUnlockedStep={maxUnlockedStep}
+                    onStepClick={handleStepClick}
+                />
 
-                <WorkflowGuide currentStep={currentStep} />
+                <WorkflowGuide currentStep={displayStep} />
 
                 <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
                     {summaryCards.map((card) => (
@@ -397,65 +462,139 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
                             </div>
                         )}
 
-                        {currentBeforeScore && (
-                            <QualityScoreCard
-                                score={currentBeforeScore}
-                                label="Before Cleaning"
-                            />
-                        )}
-
-                        {currentAfterScore &&
-                            (currentDataset.cleaningLog?.length ?? 0) > 0 && (
-                                <QualityScoreCard
-                                    score={currentAfterScore}
-                                    label="After Cleaning"
-                                />
-                            )}
-
-                        <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
-                            <AttributePanel
-                                columns={currentDataset.profile?.columns ?? []}
-                                selectedColumn={selectedColumn}
-                                onSelectColumn={setSelectedColumn}
-                            />
-                            <SelectedColumnProfile
-                                column={selectedColumnProfile}
-                            />
-                        </div>
-
-                        <DatasetPreviewTable dataset={currentDataset} />
-                        <CleanedDatasetExportPanel dataset={currentDataset} />
-                        <ProfilePanel profile={currentDataset.profile} />
-                        <ComparisonPanel
-                            datasetId={currentDataset.id}
-                            version={comparisonVersion}
-                        />
-                        <UndoToolbar
-                            datasetId={currentDataset.id}
-                            cleaningLog={currentDataset.cleaningLog}
-                            snapshotCount={
-                                currentDataset.cleaningSnapshots?.length ?? 0
+                        <Tabs
+                            value={activeTab}
+                            onValueChange={(value) =>
+                                setActiveTab(value as TabStep)
                             }
-                            onDatasetUpdated={handleDatasetUpdated}
-                        />
-                        <AiCleaningRecommendationsPanel
-                            dataset={currentDataset}
-                            onDatasetUpdated={handleDatasetUpdated}
-                        />
-                        <CleaningPanel
-                            dataset={currentDataset}
-                            onDatasetUpdated={handleDatasetUpdated}
-                        />
-                        <CleaningAuditLog log={currentDataset.cleaningLog} />
-                        <RecipePanel
-                            dataset={currentDataset}
-                            onDatasetUpdated={setCurrentDataset}
-                        />
-                        <ChartPanel dataset={currentDataset} />
-                        <InsightsPanel
-                            datasetId={currentDataset.id}
-                            version={comparisonVersion}
-                        />
+                        >
+                            <TabsList className="w-full justify-start">
+                                <TabsTrigger value="profile">
+                                    Profile
+                                </TabsTrigger>
+                                <TabsTrigger value="clean">Clean</TabsTrigger>
+                                <TabsTrigger
+                                    value="analyze"
+                                    disabled={maxUnlockedStep < 3}
+                                >
+                                    Analyze
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="visualize"
+                                    disabled={maxUnlockedStep < 4}
+                                >
+                                    Visualize
+                                </TabsTrigger>
+                            </TabsList>
+
+                            {/* ── Profile Tab ── */}
+                            <TabsContent value="profile" className="space-y-6">
+                                {currentBeforeScore && (
+                                    <QualityScoreCard
+                                        score={currentBeforeScore}
+                                        label="Before Cleaning"
+                                    />
+                                )}
+
+                                <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+                                    <AttributePanel
+                                        columns={
+                                            currentDataset.profile?.columns ??
+                                            []
+                                        }
+                                        selectedColumn={selectedColumn}
+                                        onSelectColumn={setSelectedColumn}
+                                    />
+                                    <SelectedColumnProfile
+                                        column={selectedColumnProfile}
+                                    />
+                                </div>
+
+                                <DatasetPreviewTable dataset={currentDataset} />
+
+                                <ProfilePanel
+                                    profile={currentDataset.profile}
+                                />
+                            </TabsContent>
+
+                            {/* ── Clean Tab ── */}
+                            <TabsContent value="clean" className="space-y-6">
+                                {currentAfterScore && hasCleaning && (
+                                    <QualityScoreCard
+                                        score={currentAfterScore}
+                                        label="After Cleaning"
+                                    />
+                                )}
+
+                                <UndoToolbar
+                                    datasetId={currentDataset.id}
+                                    cleaningLog={currentDataset.cleaningLog}
+                                    snapshotCount={
+                                        currentDataset.cleaningSnapshots
+                                            ?.length ?? 0
+                                    }
+                                    onDatasetUpdated={handleDatasetUpdated}
+                                />
+
+                                <AiCleaningRecommendationsPanel
+                                    dataset={currentDataset}
+                                    onDatasetUpdated={handleDatasetUpdated}
+                                />
+
+                                <CleaningPanel
+                                    dataset={currentDataset}
+                                    onDatasetUpdated={handleDatasetUpdated}
+                                />
+
+                                <CleaningAuditLog
+                                    log={currentDataset.cleaningLog}
+                                />
+
+                                <RecipePanel
+                                    dataset={currentDataset}
+                                    onDatasetUpdated={setCurrentDataset}
+                                />
+                            </TabsContent>
+
+                            {/* ── Analyze Tab ── */}
+                            <TabsContent value="analyze" className="space-y-6">
+                                {currentAfterScore && hasCleaning && (
+                                    <QualityScoreCard
+                                        score={currentAfterScore}
+                                        label="After Cleaning"
+                                    />
+                                )}
+
+                                {currentBeforeScore && !hasCleaning && (
+                                    <QualityScoreCard
+                                        score={currentBeforeScore}
+                                        label="Before Cleaning"
+                                    />
+                                )}
+
+                                <ComparisonPanel
+                                    datasetId={currentDataset.id}
+                                    version={comparisonVersion}
+                                />
+
+                                <InsightsPanel
+                                    datasetId={currentDataset.id}
+                                    version={comparisonVersion}
+                                />
+                            </TabsContent>
+
+                            {/* ── Visualize Tab ── */}
+                            <TabsContent
+                                value="visualize"
+                                className="space-y-6"
+                            >
+                                <ChartPanel dataset={currentDataset} />
+
+                                <CleanedDatasetExportPanel
+                                    dataset={currentDataset}
+                                />
+                            </TabsContent>
+                        </Tabs>
                     </>
                 )}
             </div>

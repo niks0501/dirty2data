@@ -33,27 +33,60 @@ const steps = [
     },
 ];
 
-interface Props {
+export interface WorkflowStepState {
+    /** 0-based index of the currently active (highlighted) step */
     currentStep: number;
+    /** Highest step index the user has reached / completed */
+    maxUnlockedStep: number;
 }
 
-export default function WorkflowSteps({ currentStep }: Props) {
+interface Props {
+    currentStep: number;
+    maxUnlockedStep?: number;
+    onStepClick?: (stepIndex: number) => void;
+}
+
+export default function WorkflowSteps({
+    currentStep,
+    maxUnlockedStep,
+    onStepClick,
+}: Props) {
+    const unlocked =
+        maxUnlockedStep !== undefined ? maxUnlockedStep : currentStep;
+
     return (
         <div className="grid gap-2 rounded-xl border bg-white p-3 shadow-sm sm:grid-cols-5">
             {steps.map((step, index) => {
                 const isComplete = index < currentStep;
                 const isCurrent = index === currentStep;
+                const isFuture = index > unlocked;
+                const clickable =
+                    onStepClick && index <= unlocked && index !== currentStep;
 
                 return (
                     <Tooltip key={step.label}>
                         <TooltipTrigger asChild>
-                            <div
+                            <button
+                                type="button"
                                 className={[
-                                    'flex cursor-default items-center gap-2 rounded-lg px-3 py-2 text-sm',
+                                    'flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
                                     isCurrent
                                         ? 'bg-[#E7F0F5] font-semibold text-[#284B63]'
-                                        : 'text-muted-foreground',
+                                        : '',
+                                    isComplete && !isCurrent
+                                        ? 'text-[#353535]'
+                                        : '',
+                                    isFuture ? 'text-muted-foreground' : '',
+                                    clickable
+                                        ? 'cursor-pointer hover:bg-[#F7F9FA]'
+                                        : 'cursor-default',
                                 ].join(' ')}
+                                disabled={!clickable}
+                                onClick={() => {
+                                    if (clickable && onStepClick) {
+                                        onStepClick(index);
+                                    }
+                                }}
                             >
                                 <CheckCircle2
                                     className={[
@@ -64,7 +97,7 @@ export default function WorkflowSteps({ currentStep }: Props) {
                                     ].join(' ')}
                                 />
                                 <span>{step.label}</span>
-                            </div>
+                            </button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="max-w-[220px]">
                             <p className="text-xs">{step.tooltip}</p>

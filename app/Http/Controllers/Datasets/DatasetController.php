@@ -14,11 +14,14 @@ use App\Models\DatasetCleaningRecommendation;
 use App\Models\DatasetQualityScore;
 use App\Services\AI\BusinessInsightManager;
 use App\Services\Datasets\DatasetAiContextBuilder;
+use App\Services\Datasets\DatasetBoxPlotService;
 use App\Services\Datasets\DatasetChartBuilder;
 use App\Services\Datasets\DatasetChartRecommender;
 use App\Services\Datasets\DatasetCleaner;
 use App\Services\Datasets\DatasetCleaningPreviewer;
 use App\Services\Datasets\DatasetComparisonBuilder;
+use App\Services\Datasets\DatasetCorrelationService;
+use App\Services\Datasets\DatasetMissingValueService;
 use App\Services\Datasets\DatasetPreviewParser;
 use App\Services\Datasets\DatasetProfiler;
 use App\Services\Datasets\DatasetQualityScoreClient;
@@ -323,6 +326,27 @@ class DatasetController extends Controller
                 $this->chartOptions($request),
             ),
         ]);
+    }
+
+    public function correlation(Request $request, Dataset $dataset, DatasetCorrelationService $service): JsonResponse
+    {
+        $this->authorizeDataset($request, $dataset);
+
+        return response()->json($service->compute($dataset));
+    }
+
+    public function boxPlot(Request $request, Dataset $dataset, DatasetBoxPlotService $service): JsonResponse
+    {
+        $this->authorizeDataset($request, $dataset);
+
+        return response()->json($service->compute($dataset));
+    }
+
+    public function missingValues(Request $request, Dataset $dataset, DatasetMissingValueService $service): JsonResponse
+    {
+        $this->authorizeDataset($request, $dataset);
+
+        return response()->json($service->buildMatrix($dataset));
     }
 
     public function comparison(Request $request, Dataset $dataset, DatasetComparisonBuilder $comparisonBuilder): JsonResponse

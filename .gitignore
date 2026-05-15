@@ -13,6 +13,7 @@
 /vendor
 /opencode.json
 /python-service/app/__pycache__
+/.playwright-mcp
 .tmp
 .opencode
 .serena

@@ -1,5 +1,12 @@
 import { Head, Link } from '@inertiajs/react';
-import { BarChart3, Database, FileSpreadsheet, Sparkles } from 'lucide-react';
+import {
+    BarChart3,
+    Database,
+    FileSpreadsheet,
+    HardDrive,
+    Rows3,
+    Sparkles,
+} from 'lucide-react';
 import WorkflowSteps from '@/components/datasets/workflow-steps';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,8 +17,76 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 
-export default function Dashboard() {
-    const cards = [
+interface DashboardStats {
+    totalDatasets: number;
+    readyDatasets: number;
+    totalRows: number;
+    totalSizeBytes: number;
+}
+
+interface RecentDatasetItem {
+    id: number;
+    originalName: string;
+    rowCount: number;
+    columnCount: number;
+    status: string;
+    createdAt: string;
+}
+
+interface Props {
+    stats: DashboardStats;
+    recentDatasets: RecentDatasetItem[];
+}
+
+function formatBytes(bytes: number): string {
+    if (bytes === 0) {
+        return '0 B';
+    }
+
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    const size = parseFloat((bytes / Math.pow(1024, i)).toFixed(1));
+
+    return `${size} ${units[i]}`;
+}
+
+function formatDate(isoString: string): string {
+    return new Date(isoString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
+}
+
+const kpiCards = [
+    {
+        key: 'totalDatasets',
+        label: 'Datasets',
+        icon: Database,
+        format: (v: number) => v.toLocaleString(),
+    },
+    {
+        key: 'readyDatasets',
+        label: 'Ready',
+        icon: FileSpreadsheet,
+        format: (v: number) => v.toLocaleString(),
+    },
+    {
+        key: 'totalRows',
+        label: 'Total Rows',
+        icon: Rows3,
+        format: (v: number) => v.toLocaleString(),
+    },
+    {
+        key: 'totalSizeBytes',
+        label: 'Total Size',
+        icon: HardDrive,
+        format: (v: number) => formatBytes(v),
+    },
+];
+
+export default function Dashboard({ stats, recentDatasets }: Props) {
+    const featureCards = [
         {
             title: 'Upload datasets',
             description:
@@ -60,10 +135,85 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                <WorkflowSteps currentStep={0} />
+                <WorkflowSteps currentStep={0} maxUnlockedStep={0} />
+
+                {/* KPI Summary Cards */}
+                {stats.totalDatasets > 0 && (
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        {kpiCards.map((card) => {
+                            const value =
+                                stats[card.key as keyof DashboardStats];
+                            const Icon = card.icon;
+
+                            return (
+                                <Card key={card.key}>
+                                    <CardContent className="flex items-center gap-3 p-4">
+                                        <Icon className="size-5 shrink-0 text-[#284B63]" />
+                                        <div className="min-w-0">
+                                            <p className="text-xs text-muted-foreground">
+                                                {card.label}
+                                            </p>
+                                            <p className="text-lg font-semibold text-[#353535]">
+                                                {card.format(value)}
+                                            </p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Recent Datasets */}
+                {recentDatasets.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Recent datasets</CardTitle>
+                            <CardDescription>
+                                Your most recently uploaded files.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="divide-y">
+                                {recentDatasets.map((item) => (
+                                    <Link
+                                        key={item.id}
+                                        href={`/datasets/${item.id}`}
+                                        className="flex items-center justify-between rounded px-1 py-3 transition-colors hover:bg-[#F7F9FA]"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-medium text-[#353535]">
+                                                {item.originalName}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {item.rowCount.toLocaleString()}{' '}
+                                                rows · {item.columnCount}{' '}
+                                                columns ·{' '}
+                                                {formatDate(item.createdAt)}
+                                            </p>
+                                        </div>
+                                        <span
+                                            className={[
+                                                'ml-3 shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
+                                                item.status === 'ready'
+                                                    ? 'bg-[#E8F5E9] text-[#2E7D32]'
+                                                    : item.status ===
+                                                        'processing'
+                                                      ? 'bg-[#E7F0F5] text-[#284B63]'
+                                                      : 'bg-[#FDECEC] text-[#C62828]',
+                                            ].join(' ')}
+                                        >
+                                            {item.status}
+                                        </span>
+                                    </Link>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 <div className="grid gap-4 md:grid-cols-3">
-                    {cards.map((card) => (
+                    {featureCards.map((card) => (
                         <Card key={card.title}>
                             <CardHeader>
                                 <card.icon className="mb-2 size-6 text-[#3C6E71]" />
