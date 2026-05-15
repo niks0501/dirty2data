@@ -38,6 +38,7 @@ class DatasetController extends Controller
     {
         $datasets = Dataset::query()
             ->where('uploaded_by_id', $request->user()->id)
+            ->select(['id', 'original_name', 'row_count', 'column_count', 'created_at', 'status'])
             ->latest()
             ->get()
             ->map(fn (Dataset $dataset): array => [

@@ -12,6 +12,7 @@
 /resources/js/wayfinder
 /vendor
 /opencode.json
+/python-service/app/__pycache__
 .tmp
 .opencode
 .serena
@@ -31,3 +32,5 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+/test-results
+tests/e2e/.auth.json
