@@ -12,9 +12,10 @@ import type { DatasetPageProps } from '@/types/datasets';
 
 interface Props {
     dataset: DatasetPageProps;
+    activeTab: string;
 }
 
-export default function DatasetPreviewTable({ dataset }: Props) {
+export default function DatasetPreviewTable({ dataset, activeTab }: Props) {
     const hasRows = dataset.previewRows.length > 0;
 
     return (
@@ -83,7 +84,7 @@ export default function DatasetPreviewTable({ dataset }: Props) {
                             disabled={dataset.pagination.page <= 1}
                         >
                             <Link
-                                href={`/datasets/${dataset.id}?page=${dataset.pagination.page - 1}`}
+                                href={`/datasets/${dataset.id}?tab=${activeTab}&page=${dataset.pagination.page - 1}`}
                                 preserveScroll
                             >
                                 <ChevronLeft className="size-4" />
@@ -100,7 +101,7 @@ export default function DatasetPreviewTable({ dataset }: Props) {
                             }
                         >
                             <Link
-                                href={`/datasets/${dataset.id}?page=${dataset.pagination.page + 1}`}
+                                href={`/datasets/${dataset.id}?tab=${activeTab}&page=${dataset.pagination.page + 1}`}
                                 preserveScroll
                             >
                                 Next

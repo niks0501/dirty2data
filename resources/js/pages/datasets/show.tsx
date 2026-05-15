@@ -108,6 +108,14 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
     const [currentAfterScore, setCurrentAfterScore] = useState(afterScore);
     const [comparisonVersion, setComparisonVersion] = useState(0);
     const [activeTab, setActiveTab] = useState<TabStep>(() => {
+        const urlTab = new URLSearchParams(window.location.search).get(
+            'tab',
+        ) as TabStep | null;
+
+        if (urlTab && TAB_STEPS.includes(urlTab)) {
+            return urlTab;
+        }
+
         // If cleaning has been applied, default to Clean tab (showing results)
         if ((dataset.cleaningLog?.length ?? 0) > 0) {
             return 'clean';
@@ -510,7 +518,7 @@ export default function Show({ dataset, beforeScore, afterScore }: Props) {
                                     />
                                 </div>
 
-                                <DatasetPreviewTable dataset={currentDataset} />
+                                <DatasetPreviewTable dataset={currentDataset} activeTab={activeTab} />
 
                                 <ProfilePanel
                                     profile={currentDataset.profile}
